@@ -1,0 +1,226 @@
+# =============================================================================
+# NR1 Pro - .gitignore
+# Projeto React + TypeScript + Vite
+# =============================================================================
+
+# ============================================================================
+# DEPENDÊNCIAS
+# ============================================================================
+node_modules/
+.pnp
+.pnp.js
+.pnpm-debug.log*
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================================================
+# BUILD E DISTRIBUIÇÃO
+# ============================================================================
+dist/
+dist-ssr/
+build/
+*.local
+
+# ============================================================================
+# ARQUIVOS DE AMBIENTE E CONFIGURAÇÃO SENSÍVEL
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+!.env.template
+
+# ============================================================================
+# LOGS
+# ============================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ============================================================================
+# TESTES E COBERTURA
+# ============================================================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ============================================================================
+# EDITORES E IDEs
+# ============================================================================
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# IntelliJ / WebStorm / PyCharm / RubyMine / PhpStorm / AppCode / CLion / Rider / GoLand
+.idea/
+*.iml
+*.iws
+out/
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Nano
+*.save
+
+# ============================================================================
+# SISTEMAS OPERACIONAIS
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.nfs*
+
+# ============================================================================
+# FERRAMENTAS DE DESENVOLVIMENTO
+# ============================================================================
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettiercache
+
+# Stylelint
+.stylelintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+.vite/
+
+# Storybook
+storybook-static/
+
+# ============================================================================
+# ARQUIVOS TEMPORÁRIOS E CACHE
+# ============================================================================
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.fusebox/
+.dynamodb/
+.tern-port
+
+# ============================================================================
+# MISCELÂNEA
+# ============================================================================
+*.pid
+*.seed
+*.pid.lock
+.lock-wscript
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# ============================================================================
+# ARQUIVOS ESPECÍFICOS DO PROJETO
+# ============================================================================
+
+# Arquivos de backup
+*.bak
+*.backup
+
+# Arquivos de dump
+*.dump
+
+# Arquivos de exportação local
+exports/
+backups/
+
+# Arquivos de documentação gerada
+docs/generated/
+
+# Arquivos de análise e relatórios
+reports/
+analysis/
+
+# ============================================================================
+# NÃO IGNORAR (exceções importantes)
+# ============================================================================
+
+# Manter exemplo de variáveis de ambiente
+!.env.example
+!.env.template
+
+# Manter configurações do VSCode recomendadas
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Manter arquivos de configuração do projeto
+!.github/

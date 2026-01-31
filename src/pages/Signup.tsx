@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import type { RegisterData } from '@/services/authService';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { 
   Shield, 
   Eye, 
@@ -113,7 +112,7 @@ const planos = [
 
 export function Signup() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register } = useSupabaseAuth();
   const [step, setStep] = useState<Step>('conta');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -216,18 +215,13 @@ export function Signup() {
     setIsLoading(true);
     
     try {
-      const registerData: RegisterData = {
-        nome: formData.nome,
+      const registerData = {
         email: formData.email,
+        password: formData.senha,
+        nome: formData.nome,
+        sobrenome: '',
         telefone: formData.telefone,
-        senha: formData.senha,
-        empresa: {
-          nome: formData.nomeEmpresa,
-          cnpj: formData.cnpj,
-          segmento: formData.segmento,
-          tamanho: formData.tamanhoEmpresa,
-        },
-        plano: formData.plano,
+        cargo: '',
       };
       
       const success = await register(registerData);

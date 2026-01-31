@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from '@/context/AppContext';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { SupabaseAuthProvider, useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ProtectedRoute, PublicRoute } from '@/components/ProtectedRoute';
 import { Sidebar } from '@/components/Sidebar';
@@ -28,7 +28,7 @@ import { Toaster } from '@/components/ui/sonner';
 // Layout do aplicativo (com sidebar) - apenas para usuários autenticados
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { logout, usuario } = useAuth();
+  const { logout, perfil } = useSupabaseAuth();
 
   const handleLogout = () => {
     logout();
@@ -41,7 +41,7 @@ function AppLayout() {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onLogout={handleLogout} usuario={usuario} />
+        <Header onLogout={handleLogout} usuario={perfil} />
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -199,11 +199,11 @@ function AppRoutes() {
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
+      <SupabaseAuthProvider>
         <AppProvider>
           <AppRoutes />
         </AppProvider>
-      </AuthProvider>
+      </SupabaseAuthProvider>
     </ThemeProvider>
   );
 }

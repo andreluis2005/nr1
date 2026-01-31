@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -15,23 +15,23 @@ export function ProtectedRoute({
   requiredRoles = [],
   fallback
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, hasPermission, hasRole } = useAuth();
+  const { user, isInitializing, hasPermission, hasRole } = useSupabaseAuth();
   const location = useLocation();
 
   // Mostrar loading enquanto verifica autenticação
-  if (isLoading) {
+  if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-          <p className="text-gray-500">Verificando autenticação...</p>
+          <p className="text-gray-500 dark:text-gray-400">Verificando autenticação...</p>
         </div>
       </div>
     );
   }
 
   // Redirecionar para login se não estiver autenticado
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <Navigate 
         to="/login" 
@@ -46,15 +46,15 @@ export function ProtectedRoute({
     const hasAllPermissions = requiredPermissions.every(perm => hasPermission(perm));
     if (!hasAllPermissions) {
       return fallback || (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center max-w-md p-8 bg-white rounded-2xl shadow-lg">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
+          <div className="text-center max-w-md p-8 bg-white dark:bg-neutral-900 rounded-2xl shadow-lg">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Acesso Negado</h2>
-            <p className="text-gray-500 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Acesso Negado</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
               Você não tem permissão para acessar esta página. 
               Entre em contato com o administrador do sistema.
             </p>
@@ -75,15 +75,15 @@ export function ProtectedRoute({
     const hasRequiredRole = hasRole(requiredRoles);
     if (!hasRequiredRole) {
       return fallback || (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center max-w-md p-8 bg-white rounded-2xl shadow-lg">
-            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
+          <div className="text-center max-w-md p-8 bg-white dark:bg-neutral-900 rounded-2xl shadow-lg">
+            <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Acesso Restrito</h2>
-            <p className="text-gray-500 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Acesso Restrito</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
               Esta área requer um nível de permissão específico.
             </p>
             <button 
@@ -104,20 +104,20 @@ export function ProtectedRoute({
 
 // Componente para páginas públicas (redireciona se já estiver logado)
 export function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isInitializing } = useSupabaseAuth();
   const location = useLocation();
   
   const from = location.state?.from?.pathname || '/app';
 
-  if (isLoading) {
+  if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-950">
         <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  if (isAuthenticated) {
+  if (user) {
     return <Navigate to={from} replace />;
   }
 

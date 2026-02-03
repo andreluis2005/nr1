@@ -9,8 +9,8 @@ interface ProtectedRouteProps {
   fallback?: React.ReactNode;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   requiredPermissions = [],
   requiredRoles = [],
   fallback
@@ -33,10 +33,10 @@ export function ProtectedRoute({
   // Redirecionar para login se não estiver autenticado
   if (!user) {
     return (
-      <Navigate 
-        to="/login" 
-        state={{ from: location }} 
-        replace 
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname }}
+        replace
       />
     );
   }
@@ -55,10 +55,10 @@ export function ProtectedRoute({
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Acesso Negado</h2>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Você não tem permissão para acessar esta página. 
+              Você não tem permissão para acessar esta página.
               Entre em contato com o administrador do sistema.
             </p>
-            <button 
+            <button
               onClick={() => window.history.back()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -86,7 +86,7 @@ export function ProtectedRoute({
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               Esta área requer um nível de permissão específico.
             </p>
-            <button 
+            <button
               onClick={() => window.history.back()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -106,8 +106,10 @@ export function ProtectedRoute({
 export function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isInitializing } = useSupabaseAuth();
   const location = useLocation();
-  
-  const from = location.state?.from?.pathname || '/app';
+
+  const from = typeof location.state?.from === 'string'
+    ? location.state.from
+    : (location.state?.from?.pathname || '/app');
 
   if (isInitializing) {
     return (

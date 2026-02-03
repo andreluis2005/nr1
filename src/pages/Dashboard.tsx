@@ -1,7 +1,7 @@
-import { 
-  Users, 
-  ShieldCheck, 
-  AlertTriangle, 
+import {
+  Users,
+  ShieldCheck,
+  AlertTriangle,
   Calendar,
   FileText,
   Stethoscope,
@@ -13,146 +13,96 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Database
 } from 'lucide-react';
-import { useApp } from '@/context/AppContext';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useState } from 'react';
 
-// Componente de métrica premium
-function MetricCard({ 
-  title, 
-  value, 
-  subtitle, 
-  trend, 
-  trendValue, 
-  icon: Icon, 
-  color,
-  onClick 
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  icon: React.ElementType;
-  color: 'blue' | 'green' | 'amber' | 'red' | 'purple';
-  onClick?: () => void;
-}) {
-  const colorStyles = {
-    blue: 'from-blue-500/10 to-blue-600/5 text-blue-600 border-blue-200/50',
-    green: 'from-success-500/10 to-success-600/5 text-success-600 border-success-200/50',
-    amber: 'from-warning-500/10 to-warning-600/5 text-warning-600 border-warning-200/50',
-    red: 'from-danger-500/10 to-danger-600/5 text-danger-600 border-danger-200/50',
-    purple: 'from-accent-purple/10 to-accent-purple/5 text-accent-purple border-accent-purple/20',
-  };
+import { NovaEmpresaDialog } from "@/components/empresas/NovaEmpresaDialog";
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { Plus, Building2 } from "lucide-react";
 
-  const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Activity;
-  const trendColor = trend === 'up' ? 'text-success-600' : trend === 'down' ? 'text-danger-600' : 'text-neutral-500';
+import { MetricCard } from "@/components/MetricCard";
+import type { LucideIcon } from 'lucide-react';
 
-  return (
-    <div 
-      onClick={onClick}
-      className={`
-        relative overflow-hidden bg-white rounded-xl border border-neutral-150 p-5
-        hover:shadow-lg hover:border-neutral-200 transition-all duration-300 cursor-pointer group
-      `}
-    >
-      {/* Background Gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${colorStyles[color]} opacity-50`} />
-      
-      <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${colorStyles[color]} flex items-center justify-center`}>
-            <Icon className="w-5 h-5" strokeWidth={1.5} />
-          </div>
-          {trend && (
-            <div className={`flex items-center gap-1 text-xs font-medium ${trendColor}`}>
-              <TrendIcon className="w-3.5 h-3.5" />
-              {trendValue}
-            </div>
-          )}
-        </div>
-        
-        <div>
-          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-semibold text-neutral-900 mt-1 tracking-tight">{value}</p>
-          {subtitle && (
-            <p className="text-xs text-neutral-400 mt-1">{subtitle}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Componente de status card
-function StatusCard({ 
-  title, 
-  subtitle, 
-  icon: Icon, 
-  color,
-  children,
-  action
-}: {
+// Interfaces auxiliares
+interface StatusCardProps {
   title: string;
   subtitle: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   color: string;
   children: React.ReactNode;
-  action?: { label: string; href: string };
-}) {
+  action?: {
+    label: string;
+    href: string;
+  };
+}
+
+function StatusCard({ title, subtitle, icon: Icon, color, children, action }: StatusCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-neutral-150 p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-5 h-5" strokeWidth={1.5} />
+    <div className="bg-white rounded-xl border border-neutral-150 p-5">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
+            <Icon className="w-5 h-5" strokeWidth={1.5} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-900">{title}</h3>
+            <p className="text-xs text-neutral-500">{subtitle}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-medium text-neutral-900">{title}</h3>
-          <p className="text-xs text-neutral-500">{subtitle}</p>
-        </div>
+        {action && (
+          <a
+            href={action.href}
+            className="text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-full transition-colors"
+          >
+            {action.label}
+          </a>
+        )}
       </div>
       {children}
-      {action && (
-        <a 
-          href={action.href}
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 mt-4 group"
-        >
-          {action.label}
-          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </a>
-      )}
     </div>
   );
 }
 
-// Componente de alerta
-function AlertItem({ alerta }: { alerta: any }) {
-  const prioridadeStyles = {
-    critica: 'bg-danger-50 border-danger-100 text-danger-700',
-    alta: 'bg-warning-50 border-warning-100 text-warning-700',
-    media: 'bg-amber-50 border-amber-100 text-amber-700',
-    baixa: 'bg-neutral-50 border-neutral-100 text-neutral-600',
+interface AlertItemProps {
+  alerta: {
+    id: string;
+    titulo: string;
+    descricao: string;
+    prioridade: 'baixa' | 'media' | 'alta' | 'critica';
+    dataCriacao: string;
   };
+}
 
-  const prioridadeIcons = {
-    critica: AlertCircle,
-    alta: AlertTriangle,
-    media: Clock,
-    baixa: CheckCircle2,
+function AlertItem({ alerta }: AlertItemProps) {
+  const getPrioridadeColor = (p: string) => {
+    switch (p) {
+      case 'critica': return 'bg-red-50 text-red-700 border-red-100';
+      case 'alta': return 'bg-orange-50 text-orange-700 border-orange-100';
+      case 'media': return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      default: return 'bg-blue-50 text-blue-700 border-blue-100';
+    }
   };
-
-  const Icon = prioridadeIcons[alerta.prioridade as keyof typeof prioridadeIcons] || Clock;
-  const style = prioridadeStyles[alerta.prioridade as keyof typeof prioridadeStyles] || prioridadeStyles.baixa;
 
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-lg border ${style}`}>
-      <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+    <div className="flex gap-3 p-3 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors bg-white">
+      <div className={`w-1 shrink-0 rounded-full ${alerta.prioridade === 'critica' ? 'bg-red-500' :
+          alerta.prioridade === 'alta' ? 'bg-orange-500' :
+            alerta.prioridade === 'media' ? 'bg-yellow-500' : 'bg-blue-500'
+        }`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{alerta.titulo}</p>
-        <p className="text-xs opacity-80 mt-0.5 line-clamp-2">{alerta.descricao}</p>
-        <p className="text-2xs opacity-60 mt-2">
-          {new Date(alerta.dataCriacao).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
+        <div className="flex items-center justify-between mb-1">
+          <h4 className="text-sm font-medium text-neutral-900 truncate">{alerta.titulo}</h4>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded border capitalize ${getPrioridadeColor(alerta.prioridade)}`}>
+            {alerta.prioridade}
+          </span>
+        </div>
+        <p className="text-xs text-neutral-500 line-clamp-1">{alerta.descricao}</p>
+        <p className="text-[10px] text-neutral-400 mt-1.5">
+          {new Date(alerta.dataCriacao).toLocaleDateString('pt-BR')}
         </p>
       </div>
     </div>
@@ -160,15 +110,27 @@ function AlertItem({ alerta }: { alerta: any }) {
 }
 
 export function Dashboard() {
-  const { metrics, alertas, exames, treinamentos } = useApp();
+  const { empresaSelecionada } = useSupabaseAuth();
+  // Consome APENAS dados reais do hook
+  const {
+    metrics,
+    alertas,
+    exames,
+    treinamentos,
+    isLoading,
+    error
+  } = useDashboardMetrics();
+
   const [periodoSelecionado, setPeriodoSelecionado] = useState('30d');
 
-  const alertasRecentes = alertas.filter(a => a.status !== 'resolvido').slice(0, 4);
+  const alertasLista = Array.isArray(alertas) ? alertas : [];
+  const alertasRecentes = alertasLista.filter(a => a.status !== 'resolvido').slice(0, 4);
 
   const hoje = new Date();
   const trintaDias = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
-  
-  const examesProximos = exames.filter(e => {
+
+  const examesLista = Array.isArray(exames) ? exames : [];
+  const examesProximos = examesLista.filter(e => {
     const vencimento = new Date(e.dataVencimento);
     return e.status === 'realizado' && vencimento <= trintaDias && vencimento >= hoje;
   }).slice(0, 5);
@@ -179,14 +141,95 @@ export function Dashboard() {
     return 'red' as const;
   };
 
+  // Gráfico zerado se não houver conformidade real calculada
   const dadosGrafico = [
-    { mes: 'Ago', valor: 72, meta: 85 },
-    { mes: 'Set', valor: 78, meta: 85 },
-    { mes: 'Out', valor: 82, meta: 90 },
-    { mes: 'Nov', valor: 85, meta: 90 },
-    { mes: 'Dez', valor: 84, meta: 95 },
+    { mes: 'Ago', valor: 0, meta: 85 },
+    { mes: 'Set', valor: 0, meta: 85 },
+    { mes: 'Out', valor: 0, meta: 90 },
+    { mes: 'Nov', valor: 0, meta: 90 },
+    { mes: 'Dez', valor: 0, meta: 95 },
     { mes: 'Jan', valor: metrics.indiceConformidade, meta: 95 }
   ];
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin mb-4" />
+        <p className="text-neutral-500 font-medium">Carregando indicadores...</p>
+      </div>
+    );
+  }
+
+  // Onboarding: Sem empresa selecionada
+  // O usuário precisa criar uma empresa antes de qualquer coisa
+  if (!isLoading && !empresaSelecionada) {
+    return (
+      <div className="p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Bem-vindo ao NR1 Pro</h1>
+            <p className="text-sm text-neutral-500 mt-1">Sua plataforma de gestão de SST</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-neutral-200 border-dashed">
+          <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mb-6">
+            <Building2 className="w-10 h-10 text-primary-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-neutral-900 mb-3">
+            Vamos configurar seu ambiente
+          </h2>
+          <p className="text-neutral-500 text-center max-w-md mb-8">
+            Para começar a gerenciar funcionários e documentos, você precisa criar o perfil da sua empresa. É rápido e fácil.
+          </p>
+
+          <NovaEmpresaDialog
+            trigger={
+              <button
+                className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/20 flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Criar Minha Empresa
+              </button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Estado vazio global se não houver funcionários cadastrados
+  // (Assume-se que funcionários são a base para qualquer métrica de SST)
+  if (!isLoading && metrics.totalFuncionarios === 0) {
+    return (
+      <div className="p-6 animate-fade-in">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Dashboard</h1>
+            <p className="text-sm text-neutral-500 mt-1">Visão geral da conformidade com a NR-1</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
+          <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-4">
+            <Database className="w-8 h-8 text-neutral-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-neutral-900 mb-2">
+            Nenhum dado encontrado
+          </h2>
+          <p className="text-neutral-500 text-center max-w-md mb-6">
+            Cadastre funcionários e exames para visualizar os indicadores de conformidade NR-1.
+          </p>
+          <a
+            href="#/app/funcionarios"
+            className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Cadastrar Funcionário
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -199,7 +242,7 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select 
+          <select
             value={periodoSelecionado}
             onChange={(e) => setPeriodoSelecionado(e.target.value)}
             className="px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
@@ -271,18 +314,18 @@ export function Dashboard() {
               </div>
             </div>
           </div>
-          
+
           {/* Chart */}
           <div className="h-64 flex items-end justify-between gap-3">
             {dadosGrafico.map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div className="w-full flex items-end justify-center gap-1 h-52">
-                  <div 
+                  <div
                     className="flex-1 bg-gradient-to-t from-success-500 to-success-400 rounded-t-md transition-all duration-500 hover:opacity-80"
                     style={{ height: `${item.valor}%` }}
                     title={`${item.valor}%`}
                   />
-                  <div 
+                  <div
                     className="w-1 bg-primary-400/30 rounded-t"
                     style={{ height: `${item.meta}%` }}
                     title={`Meta: ${item.meta}%`}
@@ -379,8 +422,8 @@ export function Dashboard() {
               <h2 className="text-lg font-semibold text-neutral-900">Alertas Recentes</h2>
               <p className="text-sm text-neutral-500">Itens que precisam de atenção imediata</p>
             </div>
-            <a 
-              href="#/app/alertas" 
+            <a
+              href="#/app/alertas"
               className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 group"
             >
               Ver todos
@@ -411,8 +454,8 @@ export function Dashboard() {
               <h2 className="text-lg font-semibold text-neutral-900">Exames a Vencer</h2>
               <p className="text-sm text-neutral-500">Próximos 30 dias</p>
             </div>
-            <a 
-              href="#/app/exames" 
+            <a
+              href="#/app/exames"
               className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 group"
             >
               Ver todos

@@ -1,6 +1,7 @@
 import { Bell, User, ChevronDown, Building2, LogOut, Settings, Search } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { useAuth } from '@/context/AuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useData } from '@/context/DataContext';
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
@@ -11,8 +12,9 @@ interface HeaderProps {
 }
 
 export function Header({ onLogout, usuario: propUsuario }: HeaderProps) {
-  const { empresa, alertas } = useApp();
-  const { usuario: authUsuario, logout } = useAuth();
+  const { empresa } = useApp();
+  const { alertas } = useData();
+  const { perfil: authUsuario, logout } = useSupabaseAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -20,8 +22,9 @@ export function Header({ onLogout, usuario: propUsuario }: HeaderProps) {
 
   const usuario = propUsuario || authUsuario;
 
-  const alertasPendentes = alertas.filter(a => a.status !== 'resolvido');
-  const alertasCriticos = alertasPendentes.filter(a => a.prioridade === 'critica');
+  const alertasLista = Array.isArray(alertas) ? alertas : [];
+  const alertasPendentes = alertasLista.filter(a => a?.status !== 'resolvido');
+  const alertasCriticos = alertasPendentes.filter(a => a?.prioridade === 'critica');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -95,8 +98,8 @@ export function Header({ onLogout, usuario: propUsuario }: HeaderProps) {
             <Building2 className="w-4 h-4 text-white" />
           </div>
           <div className="hidden lg:block">
-            <p className="text-sm font-medium text-neutral-900">{empresa.nomeFantasia}</p>
-            <p className="text-2xs text-neutral-500 uppercase tracking-wide">CNPJ {empresa.cnpj}</p>
+            <p className="text-sm font-medium text-neutral-900">{empresa?.nomeFantasia || 'Carregando...'}</p>
+            <p className="text-2xs text-neutral-500 uppercase tracking-wide">CNPJ {empresa?.cnpj || '---'}</p>
           </div>
         </div>
       </div>
@@ -122,9 +125,8 @@ export function Header({ onLogout, usuario: propUsuario }: HeaderProps) {
           >
             <Bell className="w-5 h-5" strokeWidth={1.5} />
             {alertasPendentes.length > 0 && (
-              <span className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full text-2xs font-medium text-white flex items-center justify-center ring-2 ring-white ${
-                alertasCriticos.length > 0 ? 'bg-danger-500' : 'bg-primary-500'
-              }`}>
+              <span className={`absolute top-1.5 right-1.5 w-4 h-4 rounded-full text-2xs font-medium text-white flex items-center justify-center ring-2 ring-white ${alertasCriticos.length > 0 ? 'bg-danger-500' : 'bg-primary-500'
+                }`}>
                 {alertasPendentes.length > 9 ? '9+' : alertasPendentes.length}
               </span>
             )}
@@ -158,8 +160,8 @@ export function Header({ onLogout, usuario: propUsuario }: HeaderProps) {
                           {alerta.descricao}
                         </p>
                         <p className="text-2xs text-neutral-400 mt-2">
-                          {new Date(alerta.dataCriacao).toLocaleDateString('pt-BR', { 
-                            day: 'numeric', 
+                          {new Date(alerta.dataCriacao).toLocaleDateString('pt-BR', {
+                            day: 'numeric',
                             month: 'short',
                             hour: '2-digit',
                             minute: '2-digit'

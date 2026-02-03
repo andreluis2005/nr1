@@ -28,11 +28,11 @@ export const supabase: SupabaseClient<Database> = createClient(
       storageKey: 'nr1-pro-auth-token',
       storage: localStorage,
     },
-    global: {
+    /* global: {
       headers: {
         'x-application-name': 'nr1-pro',
       },
-    },
+    }, */
   }
 );
 
@@ -40,13 +40,13 @@ export const supabase: SupabaseClient<Database> = createClient(
 // TIPOS AUXILIARES
 // =============================================================================
 
-export type Tables<T extends keyof Database['public']['Tables']> = 
+export type Tables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Row'];
 
-export type InsertTables<T extends keyof Database['public']['Tables']> = 
+export type InsertTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Insert'];
 
-export type UpdateTables<T extends keyof Database['public']['Tables']> = 
+export type UpdateTables<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update'];
 
 // =============================================================================
@@ -114,16 +114,16 @@ export async function query<T>(
   queryFn: (qb: any) => Promise<{ data: T | null; error: any }>
 ): Promise<T> {
   const { data, error } = await queryFn(supabase.from(table));
-  
+
   if (error) {
     console.error(`[Supabase Error] ${table}:`, error);
     throw new Error(error.message);
   }
-  
+
   if (data === null) {
     throw new Error(`Nenhum dado retornado de ${table}`);
   }
-  
+
   return data;
 }
 

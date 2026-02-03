@@ -1,11 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Stethoscope, 
-  GraduationCap, 
-  Bell, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  FileText,
+  Stethoscope,
+  GraduationCap,
+  Bell,
+  BarChart3,
   Settings,
   HelpCircle,
   Shield,
@@ -15,7 +15,8 @@ import {
   Fingerprint,
   CheckSquare,
   Send,
-  Building2
+  Building2,
+  Users
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,6 +35,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { path: '/app', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/app/analytics', icon: TrendingUp, label: 'Analytics' },
+  { path: '/app/funcionarios', icon: Users, label: 'Funcionários' },
   { path: '/app/pgr', icon: FileText, label: 'PGR' },
   { path: '/app/exames', icon: Stethoscope, label: 'Exames' },
   { path: '/app/treinamentos', icon: GraduationCap, label: 'Treinamentos' },
@@ -59,10 +61,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   };
 
   return (
-    <aside 
-      className={`bg-white border-r border-neutral-150 h-screen flex flex-col transition-all duration-300 ease-smooth ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
+    <aside
+      className={`bg-white border-r border-neutral-150 h-screen flex flex-col transition-all duration-300 ease-smooth ${collapsed ? 'w-16' : 'w-64'
+        }`}
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-neutral-150">
@@ -98,10 +99,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         )}
         {menuItems.slice(0, 5).map((item) => (
-          <NavItem 
-            key={item.path} 
-            item={item} 
-            collapsed={collapsed} 
+          <NavItem
+            key={item.path}
+            item={item}
+            collapsed={collapsed}
             isActive={isActive(item.path)}
             hoveredItem={hoveredItem}
             setHoveredItem={setHoveredItem}
@@ -115,9 +116,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         )}
         {menuItems.slice(5, 10).map((item) => (
-          <NavItem 
-            key={item.path} 
-            item={item} 
+          <NavItem
+            key={item.path}
+            item={item}
             collapsed={collapsed}
             isActive={isActive(item.path)}
             hoveredItem={hoveredItem}
@@ -132,9 +133,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         )}
         {menuItems.slice(10).map((item) => (
-          <NavItem 
-            key={item.path} 
-            item={item} 
+          <NavItem
+            key={item.path}
+            item={item}
             collapsed={collapsed}
             isActive={isActive(item.path)}
             hoveredItem={hoveredItem}
@@ -149,8 +150,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           to="/app/ajuda"
           className={({ isActive }) => `
             flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-fast
-            ${isActive 
-              ? 'bg-primary-50 text-primary-600' 
+            ${isActive
+              ? 'bg-primary-50 text-primary-600'
               : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700'
             }
             ${collapsed ? 'justify-center' : ''}
@@ -205,11 +206,11 @@ function NavItem({ item, collapsed, isActive, hoveredItem, setHoveredItem }: Nav
         relative flex items-center justify-center
         ${isActive ? 'text-primary-600' : 'text-neutral-500 group-hover:text-neutral-700'}
       `}>
-        <Icon 
-          className={`w-5 h-5 transition-all duration-fast ${isActive ? '' : 'group-hover:scale-105'}`} 
-          strokeWidth={isActive ? 2 : 1.5} 
+        <Icon
+          className={`w-5 h-5 transition-all duration-fast ${isActive ? '' : 'group-hover:scale-105'}`}
+          strokeWidth={isActive ? 2 : 1.5}
         />
-        
+
         {/* Badge */}
         {item.badge && item.badge > 0 && (
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger-500 text-white text-2xs font-medium rounded-full flex items-center justify-center ring-2 ring-white">
@@ -220,9 +221,8 @@ function NavItem({ item, collapsed, isActive, hoveredItem, setHoveredItem }: Nav
 
       {/* Label */}
       {!collapsed && (
-        <span className={`font-medium text-sm transition-all duration-fast ${
-          isActive ? 'font-semibold' : ''
-        }`}>
+        <span className={`font-medium text-sm transition-all duration-fast ${isActive ? 'font-semibold' : ''
+          }`}>
           {item.label}
         </span>
       )}

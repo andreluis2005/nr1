@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import { 
-  Shield, 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Mail, 
+import {
+  Shield,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
   User,
   Building2,
   Phone,
@@ -28,13 +28,13 @@ interface FormData {
   senha: string;
   confirmarSenha: string;
   aceitarTermos: boolean;
-  
+
   // Empresa
   nomeEmpresa: string;
   cnpj: string;
   segmento: string;
   tamanhoEmpresa: string;
-  
+
   // Plano
   plano: 'trial' | 'starter' | 'business';
 }
@@ -117,7 +117,7 @@ export function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     email: '',
@@ -141,27 +141,27 @@ export function Signup() {
       if (!formData.nome.trim()) {
         newErrors.nome = 'Nome completo é obrigatório';
       }
-      
+
       if (!formData.email.trim()) {
         newErrors.email = 'Email é obrigatório';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         newErrors.email = 'Email inválido';
       }
-      
+
       if (!formData.telefone.trim()) {
         newErrors.telefone = 'Telefone é obrigatório';
       }
-      
+
       if (!formData.senha) {
         newErrors.senha = 'Senha é obrigatória';
       } else if (formData.senha.length < 8) {
         newErrors.senha = 'Senha deve ter pelo menos 8 caracteres';
       }
-      
+
       if (formData.senha !== formData.confirmarSenha) {
         newErrors.confirmarSenha = 'Senhas não coincidem';
       }
-      
+
       if (!formData.aceitarTermos) {
         newErrors.aceitarTermos = 'Você deve aceitar os termos';
       }
@@ -171,17 +171,17 @@ export function Signup() {
       if (!formData.nomeEmpresa.trim()) {
         newErrors.nomeEmpresa = 'Nome da empresa é obrigatório';
       }
-      
+
       if (!formData.cnpj.trim()) {
         newErrors.cnpj = 'CNPJ é obrigatório';
       } else if (!/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/.test(formData.cnpj.replace(/\D/g, ''))) {
         newErrors.cnpj = 'CNPJ inválido';
       }
-      
+
       if (!formData.segmento) {
         newErrors.segmento = 'Segmento é obrigatório';
       }
-      
+
       if (!formData.tamanhoEmpresa) {
         newErrors.tamanhoEmpresa = 'Tamanho da empresa é obrigatório';
       }
@@ -213,7 +213,7 @@ export function Signup() {
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    
+
     try {
       const registerData = {
         email: formData.email,
@@ -222,8 +222,10 @@ export function Signup() {
         sobrenome: '',
         telefone: formData.telefone,
         cargo: '',
+        empresa_nome: formData.nomeEmpresa,
+        empresa_cnpj: formData.cnpj,
       };
-      
+
       const success = await register(registerData);
 
       if (success) {
@@ -287,7 +289,7 @@ export function Signup() {
         {steps.map((s, index) => {
           const isActive = step === s.key;
           const isCompleted = steps.findIndex(st => st.key === step) > index;
-          
+
           return (
             <div key={s.key} className="flex items-center">
               <div className={`
@@ -372,9 +374,8 @@ export function Signup() {
                         value={formData.nome}
                         onChange={(e) => updateField('nome', e.target.value)}
                         placeholder="Seu nome completo"
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.nome ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.nome ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                     </div>
                     {errors.nome && (
@@ -397,9 +398,8 @@ export function Signup() {
                         value={formData.email}
                         onChange={(e) => updateField('email', e.target.value)}
                         placeholder="seu@empresa.com.br"
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.email ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.email ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                     </div>
                     {errors.email && (
@@ -422,9 +422,8 @@ export function Signup() {
                         value={formData.telefone}
                         onChange={(e) => updateField('telefone', formatTelefone(e.target.value))}
                         placeholder="(11) 99999-9999"
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.telefone ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.telefone ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                     </div>
                     {errors.telefone && (
@@ -447,9 +446,8 @@ export function Signup() {
                         value={formData.senha}
                         onChange={(e) => updateField('senha', e.target.value)}
                         placeholder="Mínimo 8 caracteres"
-                        className={`w-full pl-10 pr-12 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.senha ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-12 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.senha ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                       <button
                         type="button"
@@ -463,7 +461,7 @@ export function Signup() {
                       <div className="mt-2">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="flex-1 h-1 bg-neutral-100 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className={`h-full transition-all duration-300 ${passwordStrength.color}`}
                               style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
                             />
@@ -492,9 +490,8 @@ export function Signup() {
                         value={formData.confirmarSenha}
                         onChange={(e) => updateField('confirmarSenha', e.target.value)}
                         placeholder="Repita a senha"
-                        className={`w-full pl-10 pr-12 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.confirmarSenha ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-12 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.confirmarSenha ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                       <button
                         type="button"
@@ -555,9 +552,8 @@ export function Signup() {
                         value={formData.nomeEmpresa}
                         onChange={(e) => updateField('nomeEmpresa', e.target.value)}
                         placeholder="Razão social ou nome fantasia"
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                          errors.nomeEmpresa ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                        }`}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.nomeEmpresa ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                          }`}
                       />
                     </div>
                     {errors.nomeEmpresa && (
@@ -579,9 +575,8 @@ export function Signup() {
                       onChange={(e) => updateField('cnpj', formatCNPJ(e.target.value))}
                       placeholder="00.000.000/0000-00"
                       maxLength={18}
-                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${
-                        errors.cnpj ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all ${errors.cnpj ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                        }`}
                     />
                     {errors.cnpj && (
                       <p className="flex items-center gap-1.5 mt-1.5 text-danger-600 text-xs">
@@ -599,9 +594,8 @@ export function Signup() {
                     <select
                       value={formData.segmento}
                       onChange={(e) => updateField('segmento', e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all bg-white ${
-                        errors.segmento ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all bg-white ${errors.segmento ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                        }`}
                     >
                       <option value="">Selecione...</option>
                       {segmentos.map(s => (
@@ -624,9 +618,8 @@ export function Signup() {
                     <select
                       value={formData.tamanhoEmpresa}
                       onChange={(e) => updateField('tamanhoEmpresa', e.target.value)}
-                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all bg-white ${
-                        errors.tamanhoEmpresa ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
-                      }`}
+                      className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all bg-white ${errors.tamanhoEmpresa ? 'border-danger-300 bg-danger-50' : 'border-neutral-200'
+                        }`}
                     >
                       <option value="">Selecione...</option>
                       {tamanhos.map(t => (
@@ -654,8 +647,8 @@ export function Signup() {
                       onClick={() => updateField('plano', plano.id as 'trial' | 'starter' | 'business')}
                       className={`
                         relative p-5 rounded-xl border-2 cursor-pointer transition-all
-                        ${formData.plano === plano.id 
-                          ? 'border-primary-500 bg-primary-50/50' 
+                        ${formData.plano === plano.id
+                          ? 'border-primary-500 bg-primary-50/50'
                           : 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
                         }
                       `}
@@ -665,7 +658,7 @@ export function Signup() {
                           Recomendado
                         </div>
                       )}
-                      
+
                       <div className="text-center mb-4">
                         <h3 className="font-semibold text-neutral-900">{plano.nome}</h3>
                         <div className="mt-2">
@@ -674,7 +667,7 @@ export function Signup() {
                         </div>
                         <p className="text-xs text-neutral-500 mt-1">{plano.descricao}</p>
                       </div>
-                      
+
                       <ul className="space-y-2">
                         {plano.features.map((feature, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-xs text-neutral-600">

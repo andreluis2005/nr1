@@ -74,6 +74,8 @@ interface RegisterData {
   sobrenome?: string;
   telefone?: string;
   cargo?: string;
+  empresa_nome?: string;
+  empresa_cnpj?: string;
 }
 
 // =============================================================================
@@ -114,7 +116,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         if (currentSession) {
           setSession(currentSession);
           setUser(currentSession.user);
-          await carregarDadosUsuario(currentSession.user.id);
+          await carregarDadosUsuario(currentSession.user.id, currentSession.user);
         }
       } catch (error) {
         console.error('[Auth] Erro na inicialização:', error);
@@ -132,7 +134,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(newSession?.user ?? null);
 
         if (event === 'SIGNED_IN' && newSession?.user) {
-          await carregarDadosUsuario(newSession.user.id);
+          await carregarDadosUsuario(newSession.user.id, newSession.user);
         } else if (event === 'SIGNED_OUT') {
           limparEstado();
         }
@@ -148,8 +150,18 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   // FUNÇÕES AUXILIARES
   // =============================================================================
 
-  const carregarDadosUsuario = useCallback(async (userId: string) => {
+  const carregarDadosUsuario = useCallback(async (userId: string, currentUser?: User) => {
     try {
+      // 0. Obter usuário mais recente para metadados se necessário
+      let userForMetadata = currentUser || user;
+
+      // Se estamos no contexto de onboarding (carregando dados iniciais), 
+      // buscar do servidor para garantir metadados frescos
+      if (!userForMetadata?.user_metadata?.empresa_nome) {
+        const { data: { user: freshUser } } = await supabase.auth.getUser();
+        if (freshUser) userForMetadata = freshUser;
+      }
+
       // Carregar perfil - com fallback se falhar (erro 500 ou RLS)
       try {
         const { data: perfilData, error: perfilError } = await supabase
@@ -163,8 +175,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
           // Fallback para perfil básico usando os dados da sessão
           setPerfil({
             id: userId,
-            nome: user?.email?.split('@')[0] || 'Usuário',
-            email: user?.email || '',
+            nome: userForMetadata?.user_metadata?.nome || userForMetadata?.email?.split('@')[0] || 'Usuário',
+            email: userForMetadata?.email || '',
             perfil: 'visualizador',
             ativo: true,
             permissoes: []
@@ -209,6 +221,28 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
           })) || [];
 
           setEmpresas(empresasFormatadas);
+
+          // LÓGICA DE ONBOARDING: Se não tem nenhuma empresa, mas tem metadados de empresa, cria agora
+          if (empresasFormatadas.length === 0 && userForMetadata?.user_metadata?.empresa_nome) {
+            console.log('[Auth] Usuário sem empresa detectado, iniciando criação via metadados...', userForMetadata.user_metadata.empresa_nome);
+            try {
+              const { error: rpcError } = await (supabase as any)
+                .rpc('criar_empresa_rpc', {
+                  p_nome_fantasia: userForMetadata.user_metadata.empresa_nome,
+                  p_cnpj: userForMetadata.user_metadata.empresa_cnpj || null
+                });
+
+              if (rpcError) throw rpcError;
+
+              console.log('[Auth] Empresa criada com sucesso via onboarding');
+              // Recarregar empresas após criação e retornar pra evitar selecionar null
+              // Passamos o userForMetadata para manter a consistência
+              await carregarDadosUsuario(userId, userForMetadata);
+              return;
+            } catch (rpcErr) {
+              console.error('[Auth] Erro ao criar empresa no onboarding:', rpcErr);
+            }
+          }
 
           // Selecionar empresa principal ou primeira
           const principal = empresasFormatadas.find((e: EmpresaVinculada) => e.is_principal);
@@ -275,7 +309,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setSession(data.session);
         setUser(data.session.user);
         // Desparar o carregamento de dados mas não esperar por ele para navegar
-        carregarDadosUsuario(data.session.user.id);
+        carregarDadosUsuario(data.session.user.id, data.session.user);
       }
 
       toast.success('Login realizado com sucesso!');
@@ -303,6 +337,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
             telefone: data.telefone,
             cargo: data.cargo,
             perfil: 'admin', // Primeiro usuário é admin
+            empresa_nome: data.empresa_nome,
+            empresa_cnpj: data.empresa_cnpj,
           },
         },
       });
@@ -423,8 +459,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
     try {
       // Usar RPC segura para contornar RLS de insert
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc<any>('criar_empresa_rpc', {
+      const { error: rpcError } = await (supabase as any)
+        .rpc('criar_empresa_rpc', {
           p_nome_fantasia: dados.nome,
           p_cnpj: dados.cnpj || null
         });
@@ -432,7 +468,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       if (rpcError) throw rpcError;
 
       // Recarregar dados completos do usuário para atualizar lista de empresas
-      await carregarDadosUsuario(user.id);
+      await carregarDadosUsuario(user.id, user);
 
       // Encontrar a empresa recém criada na lista atualizada (pode ter delay, então fallback pro reload)
       // Como o carregarDadosUsuario atualiza o state 'empresas' e 'empresaSelecionada', 

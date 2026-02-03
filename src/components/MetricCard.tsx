@@ -8,7 +8,7 @@ interface MetricCardProps {
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   icon: LucideIcon;
-  color: 'blue' | 'green' | 'yellow' | 'red' | 'purple';
+  color: 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'amber' | 'orange';
   onClick?: () => void;
 }
 
@@ -30,6 +30,18 @@ const colorVariants = {
     icon: 'text-yellow-600 dark:text-yellow-400',
     border: 'border-yellow-200 dark:border-yellow-800',
     hover: 'hover:border-yellow-300 hover:bg-yellow-100/50 dark:hover:border-yellow-700 dark:hover:bg-yellow-900/50'
+  },
+  amber: {
+    bg: 'bg-amber-50 dark:bg-amber-900/30',
+    icon: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-200 dark:border-amber-800',
+    hover: 'hover:border-amber-300 hover:bg-amber-100/50 dark:hover:border-amber-700 dark:hover:bg-amber-900/50'
+  },
+  orange: {
+    bg: 'bg-orange-50 dark:bg-orange-900/30',
+    icon: 'text-orange-600 dark:text-orange-400',
+    border: 'border-orange-200 dark:border-orange-800',
+    hover: 'hover:border-orange-300 hover:bg-orange-100/50 dark:hover:border-orange-700 dark:hover:bg-orange-900/50'
   },
   red: {
     bg: 'bg-red-50 dark:bg-red-900/30',
@@ -55,14 +67,15 @@ export function MetricCard({
   color,
   onClick
 }: MetricCardProps) {
-  const colors = colorVariants[color];
+  // Garantir fallback para evitar crash se receber uma cor não mapeada
+  const colors = colorVariants[color] || colorVariants.blue;
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' 
-    ? 'text-green-600 dark:text-green-400' 
-    : trend === 'down' 
-    ? 'text-red-600 dark:text-red-400' 
-    : 'text-gray-500 dark:text-gray-400';
+  const trendColor = trend === 'up'
+    ? 'text-green-600 dark:text-green-400'
+    : trend === 'down'
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-gray-500 dark:text-gray-400';
 
   return (
     <div
@@ -80,7 +93,7 @@ export function MetricCard({
           </div>
         )}
       </div>
-      
+
       <div className="mt-4">
         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
         <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>

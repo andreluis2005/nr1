@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import type { Metrics, Alerta, Exame, Treinamento } from '@/context/DataContext';
+import type { Metrics, Alerta, Exame, Treinamento, Funcionario, OnboardingStatus } from '@/context/DataContext';
 
 // Dados de fallback caso não haja empresa selecionada ou erro
 const fallbackMetrics: Metrics = {
@@ -21,11 +21,21 @@ const fallbackMetrics: Metrics = {
     pgrStatus: 'atencao'
 };
 
+const defaultOnboarding: OnboardingStatus = {
+    empresaCriada: false,
+    setorCadastrado: false,
+    funcionarioCadastrado: false,
+    vinculoSetorEfetivado: false,
+    completouOnboarding: false
+};
+
 interface UseDashboardMetricsResult {
     metrics: Metrics;
     alertas: Alerta[];
     exames: Exame[];
     treinamentos: Treinamento[];
+    funcionarios: any[];
+    onboarding: OnboardingStatus;
     isLoading: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
@@ -38,6 +48,8 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
     const [alertas, setAlertas] = useState<Alerta[]>([]);
     const [exames, setExames] = useState<Exame[]>([]);
     const [treinamentos, setTreinamentos] = useState<Treinamento[]>([]);
+    const [funcionarios, setFuncionarios] = useState<any[]>([]);
+    const [onboarding, setOnboarding] = useState<OnboardingStatus>(defaultOnboarding);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -61,13 +73,13 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             // -----------------------------------------------------------------
             const { data: funcionariosData, error: funcError } = await supabase
                 .from('funcionarios')
-                .select('id, status')
+                .select('id, nome_completo, status, matricula')
                 .eq('empresa_id', empresaId);
 
             if (funcError) throw funcError;
 
-            const totalFuncionarios = funcionariosData?.length || 0;
-            const funcionariosAtivos = funcionariosData?.filter(f => f.status === 'ativo').length || 0;
+            const totalFuncionarios = (funcionariosData as any[] || []).length;
+            const funcionariosAtivos = (funcionariosData as any[] || []).filter(f => f.status === 'ativo').length || 0;
 
             // -----------------------------------------------------------------
             // 2. ASOs (Exames Ocupacionais)
@@ -75,7 +87,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             const { data: asosData, error: asoError } = await supabase
                 .from('asos')
                 .select('id, funcionario_id, tipo_aso, data_validade, status')
-                .eq('empresa_id', empresaId);
+                .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
 
             if (asoError) throw asoError;
 
@@ -99,6 +111,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 status: aso.data_validade && aso.data_validade < hoje
                     ? 'vencido'
                     : (aso.status === 'aprovado' ? 'realizado' : 'pendente'),
+                dataRealizacao: aso.data_validade || '', // Temporário: usar validade como realização se vácuo
                 dataVencimento: aso.data_validade || ''
             }));
 
@@ -111,7 +124,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 .eq('usuario_id', user?.id || '')
                 .eq('lida', false)
                 .order('created_at', { ascending: false })
-                .limit(10);
+                .limit(10) as { data: any[] | null, error: any };
 
             if (notifError) throw notifError;
 
@@ -167,7 +180,38 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
             setAlertas(alertasFormatados);
             setExames(examesFormatados);
-            setTreinamentos([]); // Tabela não existe ainda
+            setTreinamentos([]);
+            setFuncionarios((funcionariosData as any[])?.map(f => ({
+                id: f.id,
+                nome_completo: f.nome_completo,
+                matricula: f.matricula,
+                status: f.status,
+                setor_id: f.setor_id
+            })) || []);
+
+            // -----------------------------------------------------------------
+            // 6. STATUS DE ONBOARDING REATIVO (Fase 3)
+            // -----------------------------------------------------------------
+            // 6a. Verificar setores
+            const { count: countSetores, error: errorSetores } = await supabase
+                .from('setores')
+                .select('*', { count: 'exact', head: true })
+                .eq('empresa_id', empresaId);
+
+            if (errorSetores) console.error('[Auth] Erro ao contar setores:', errorSetores);
+
+            // 6b. Verificar se existe ao menos um funcionário com setor_id preenchido
+            const hasVinculo = (funcionariosData as any[] || []).some(f => f.setor_id !== null);
+
+            const onboardingStatus: OnboardingStatus = {
+                empresaCriada: true, // Se chegou aqui, a empresa existe
+                setorCadastrado: (countSetores || 0) > 0,
+                funcionarioCadastrado: totalFuncionarios > 0,
+                vinculoSetorEfetivado: hasVinculo,
+                completouOnboarding: (countSetores || 0) > 0 && totalFuncionarios > 0 && hasVinculo
+            };
+
+            setOnboarding(onboardingStatus);
 
         } catch (err) {
             console.error('[useDashboardMetrics] Erro ao buscar métricas:', err);
@@ -187,6 +231,8 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         alertas,
         exames,
         treinamentos,
+        funcionarios,
+        onboarding,
         isLoading,
         error,
         refetch: fetchMetrics

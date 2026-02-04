@@ -68,11 +68,18 @@ CREATE TABLE IF NOT EXISTS public.empresas (
     -- Status
     status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa', 'inativa', 'suspensa', 'cancelada')),
     
+    -- Hierarquia
+    empresa_pai_id UUID REFERENCES public.empresas(id) ON DELETE SET NULL,
+    
     -- Metadados
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID REFERENCES auth.users(id)
 );
+
+-- Índices e Comentários de Hierarquia
+CREATE INDEX IF NOT EXISTS idx_empresas_pai ON public.empresas(empresa_pai_id);
+COMMENT ON COLUMN public.empresas.empresa_pai_id IS 'ID da empresa matriz (null se a empresa for a própria matriz)';
 
 -- =============================================================================
 -- TABELA: USUÁRIOS_EMPRESAS (Relacionamento N:N)
@@ -128,11 +135,25 @@ CREATE TABLE IF NOT EXISTS public.auditoria_logs (
 );
 
 -- =============================================================================
+-- TABELA: SETORES
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.setores (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empresa_id UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(empresa_id, nome)
+);
+
+-- =============================================================================
 -- TABELA: FUNCIONÁRIOS (Colaboradores da empresa)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.funcionarios (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     empresa_id UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+    setor_id UUID REFERENCES public.setores(id) ON DELETE SET NULL,
     
     -- Dados Pessoais
     nome_completo TEXT NOT NULL,
@@ -325,8 +346,11 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_empresa ON public.auditoria_logs(empres
 CREATE INDEX IF NOT EXISTS idx_auditoria_created ON public.auditoria_logs(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_funcionarios_empresa ON public.funcionarios(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_funcionarios_setor ON public.funcionarios(setor_id);
 CREATE INDEX IF NOT EXISTS idx_funcionarios_cpf ON public.funcionarios(cpf);
 CREATE INDEX IF NOT EXISTS idx_funcionarios_status ON public.funcionarios(status);
+
+CREATE INDEX IF NOT EXISTS idx_setores_empresa ON public.setores(empresa_id);
 
 CREATE INDEX IF NOT EXISTS idx_asos_empresa ON public.asos(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_asos_funcionario ON public.asos(funcionario_id);
@@ -448,6 +472,29 @@ CREATE POLICY "Gestores gerenciam funcionários" ON public.funcionarios
     );
 
 -- =============================================================================
+-- POLÍTICAS: SETORES
+-- =============================================================================
+
+CREATE POLICY "Usuários veem setores da empresa" ON public.setores
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.usuarios_empresas ue
+            WHERE ue.empresa_id = setores.empresa_id
+            AND ue.usuario_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Gestores gerenciam setores" ON public.setores
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.usuarios_empresas ue
+            WHERE ue.empresa_id = setores.empresa_id
+            AND ue.usuario_id = auth.uid()
+            AND ue.perfil IN ('admin', 'gestor')
+        )
+    );
+
+-- =============================================================================
 -- POLÍTICAS: ASOS
 -- =============================================================================
 
@@ -546,6 +593,9 @@ CREATE TRIGGER update_empresas_updated_at BEFORE UPDATE ON public.empresas
 CREATE TRIGGER update_funcionarios_updated_at BEFORE UPDATE ON public.funcionarios
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE TRIGGER update_setores_updated_at BEFORE UPDATE ON public.setores
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 CREATE TRIGGER update_asos_updated_at BEFORE UPDATE ON public.asos
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
@@ -613,6 +663,39 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =============================================================================
+-- FUNÇÃO: Criar Empresa e Vínculo (Onboarding/Multi-empresa)
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.criar_empresa_rpc(
+    p_nome_fantasia TEXT,
+    p_cnpj TEXT DEFAULT NULL,
+    p_empresa_pai_id UUID DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    v_empresa_id UUID;
+BEGIN
+    -- 1. Verificar se a empresa já existe pelo CNPJ
+    IF p_cnpj IS NOT NULL THEN
+        SELECT id INTO v_empresa_id FROM public.empresas WHERE cnpj = p_cnpj LIMIT 1;
+    END IF;
+
+    -- 2. Se não existir, criar a nova empresa
+    IF v_empresa_id IS NULL THEN
+        INSERT INTO public.empresas (nome_fantasia, cnpj, empresa_pai_id, created_by)
+        VALUES (p_nome_fantasia, p_cnpj, p_empresa_pai_id, auth.uid())
+        RETURNING id INTO v_empresa_id;
+    END IF;
+
+    -- 3. Vincular o usuário como Admin (usando ON CONFLICT para segurança)
+    INSERT INTO public.usuarios_empresas (usuario_id, empresa_id, perfil, is_principal)
+    VALUES (auth.uid(), v_empresa_id, 'admin', TRUE)
+    ON CONFLICT (usuario_id, empresa_id) DO UPDATE SET is_principal = TRUE;
+
+    RETURN v_empresa_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =============================================================================
 -- DADOS INICIAIS (SEED)

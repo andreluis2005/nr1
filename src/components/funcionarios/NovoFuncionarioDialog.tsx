@@ -18,10 +18,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, Loader2, Building2, UserPlus } from "lucide-react";
+import { Plus, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
+import { NovoSetorDialog } from "@/components/setores/NovoSetorDialog";
 
 interface FuncionarioData {
     id: string;
@@ -29,6 +30,7 @@ interface FuncionarioData {
     matricula?: string;
     cargo?: string;
     departamento?: string;
+    setor_id?: string;
     status: string;
 }
 
@@ -37,9 +39,10 @@ interface NovoFuncionarioDialogProps {
     funcionarioToEdit?: FuncionarioData | null;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    trigger?: React.ReactNode;
 }
 
-export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: controlledOpen, onOpenChange }: NovoFuncionarioDialogProps) {
+export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: controlledOpen, onOpenChange, trigger }: NovoFuncionarioDialogProps) {
     const { empresaSelecionada, criarEmpresa } = useSupabaseAuth();
     const [internalOpen, setInternalOpen] = useState(false);
 
@@ -52,25 +55,13 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
 
     const isEditing = !!funcionarioToEdit;
     const [isLoading, setIsLoading] = useState(false);
-
-    // Step: 'empresa' | 'funcionario'
-    const [step, setStep] = useState<'empresa' | 'funcionario'>('funcionario');
-
-    useEffect(() => {
-        if (open) {
-            if (!empresaSelecionada && !isEditing) {
-                setStep('empresa');
-            } else {
-                setStep('funcionario');
-            }
-        }
-    }, [open, empresaSelecionada, isEditing]);
+    const [setores, setSetores] = useState<{ id: string, nome: string }[]>([]);
 
     // Form states
     const [nome, setNome] = useState('');
     const [matricula, setMatricula] = useState('');
     const [cargo, setCargo] = useState('');
-    const [departamento, setDepartamento] = useState('');
+    const [setorId, setSetorId] = useState<string>('');
     const [status, setStatus] = useState('ativo');
 
     // Load data when editing
@@ -79,34 +70,29 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
             setNome(funcionarioToEdit.nome_completo || '');
             setMatricula(funcionarioToEdit.matricula || '');
             setCargo(funcionarioToEdit.cargo || '');
-            setDepartamento(funcionarioToEdit.departamento || '');
+            setSetorId(funcionarioToEdit.setor_id || '');
             setStatus(funcionarioToEdit.status || 'ativo');
         } else {
-            // Reset se abrir em modo criação
             if (open && !isEditing) resetForm();
         }
     }, [funcionarioToEdit, open, isEditing]);
 
-    // Form states - Empresa
-    const [nomeEmpresa, setNomeEmpresa] = useState('');
-    const [cnpjEmpresa, setCnpjEmpresa] = useState('');
+    // Fetch setores
+    useEffect(() => {
+        const fetchSetores = async () => {
+            if (!empresaSelecionada?.empresa_id || !open) return;
+            const { data, error } = await supabase
+                .from('setores')
+                .select('id, nome')
+                .eq('empresa_id', empresaSelecionada.empresa_id);
 
-    const handleCriarEmpresa = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!nomeEmpresa.trim()) {
-            toast.error("Nome da empresa é obrigatório");
-            return;
-        }
-
-        try {
-            const novaEmpresa = await criarEmpresa({ nome: nomeEmpresa, cnpj: cnpjEmpresa });
-            if (novaEmpresa) {
-                setStep('funcionario');
+            if (!error && data) {
+                setSetores(data);
             }
-        } catch (error) {
-            console.error(error);
-        }
-    };
+        };
+
+        fetchSetores();
+    }, [empresaSelecionada?.empresa_id, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -128,7 +114,7 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
                 nome_completo: nome,
                 matricula: matricula || null,
                 cargo: cargo || null,
-                departamento: departamento || null,
+                setor_id: setorId || null,
                 status: status,
             };
 
@@ -136,14 +122,14 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
 
             if (isEditing && funcionarioToEdit) {
                 // Update
-                const { error: updateError } = await supabase
+                const { error: updateError } = await (supabase as any)
                     .from('funcionarios')
                     .update(payload)
                     .eq('id', funcionarioToEdit.id);
                 error = updateError;
             } else {
                 // Insert
-                const { error: insertError } = await supabase
+                const { error: insertError } = await (supabase as any)
                     .from('funcionarios')
                     .insert({
                         ...payload,
@@ -171,15 +157,17 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
         setNome('');
         setMatricula('');
         setCargo('');
-        setDepartamento('');
+        setSetorId('');
         setStatus('ativo');
-        setNomeEmpresa('');
-        setCnpjEmpresa('');
     };
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            {!isControlled && (
+            {trigger ? (
+                <div onClick={() => setOpen(true)}>
+                    {trigger}
+                </div>
+            ) : !isControlled && (
                 <DialogTrigger asChild>
                     <Button className="bg-primary-600 hover:bg-primary-700 text-white shadow-sm gap-2">
                         <Plus className="w-4 h-4" />
@@ -189,127 +177,108 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
             )}
 
             <DialogContent className="sm:max-w-[425px]">
-                {step === 'empresa' ? (
-                    <form onSubmit={handleCriarEmpresa}>
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <Building2 className="w-5 h-5 text-primary-600" />
-                                Criar sua Empresa
-                            </DialogTitle>
-                            <DialogDescription>
-                                Para cadastrar funcionários, primeiro precisamos criar o perfil da sua empresa.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <UserPlus className="w-5 h-5 text-primary-600" />
+                            {isEditing ? 'Editar Funcionário' : 'Novo Funcionário'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {isEditing ? "Atualize os dados do colaborador." : "Preencha os dados básicos do colaborador."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="nome">Nome Completo *</Label>
+                            <Input
+                                id="nome"
+                                value={nome}
+                                onChange={(e) => setNome(e.target.value)}
+                                placeholder="Ex: João da Silva"
+                                disabled={isLoading}
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="nomeEmpresa">Nome da Empresa / Razão Social *</Label>
+                                <Label htmlFor="matricula">Matrícula</Label>
                                 <Input
-                                    id="nomeEmpresa"
-                                    value={nomeEmpresa}
-                                    onChange={(e) => setNomeEmpresa(e.target.value)}
-                                    placeholder="Ex: Minha Empresa Ltda"
-                                    required
+                                    id="matricula"
+                                    value={matricula}
+                                    onChange={(e) => setMatricula(e.target.value)}
+                                    placeholder="Ex: 1234"
+                                    disabled={isLoading}
                                 />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="cnpjEmpresa">CNPJ (Opcional)</Label>
-                                <Input
-                                    id="cnpjEmpresa"
-                                    value={cnpjEmpresa}
-                                    onChange={(e) => setCnpjEmpresa(e.target.value)}
-                                    placeholder="00.000.000/0000-00"
-                                />
+                                <Label htmlFor="status">Status</Label>
+                                <Select value={status} onValueChange={setStatus} disabled={isLoading}>
+                                    <SelectTrigger id="status">
+                                        <SelectValue placeholder="Selecione" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ativo">Ativo</SelectItem>
+                                        <SelectItem value="ferias">Férias</SelectItem>
+                                        <SelectItem value="afastado">Afastado</SelectItem>
+                                        <SelectItem value="inativo">Inativo</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" className="bg-primary-600 hover:bg-primary-700">
-                                Criar Empresa e Continuar
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                ) : (
-                    <form onSubmit={handleSubmit}>
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <UserPlus className="w-5 h-5 text-primary-600" />
-                                {isEditing ? 'Editar Funcionário' : 'Novo Funcionário'}
-                            </DialogTitle>
-                            <DialogDescription>
-                                {isEditing ? "Atualize os dados do colaborador." : "Preencha os dados básicos do colaborador."}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="nome">Nome Completo *</Label>
-                                <Input
-                                    id="nome"
-                                    value={nome}
-                                    onChange={(e) => setNome(e.target.value)}
-                                    placeholder="Ex: João da Silva"
-                                    disabled={isLoading}
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="matricula">Matrícula</Label>
-                                    <Input
-                                        id="matricula"
-                                        value={matricula}
-                                        onChange={(e) => setMatricula(e.target.value)}
-                                        placeholder="Ex: 1234"
-                                        disabled={isLoading}
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="status">Status</Label>
-                                    <Select value={status} onValueChange={setStatus} disabled={isLoading}>
-                                        <SelectTrigger id="status">
-                                            <SelectValue placeholder="Selecione" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ativo">Ativo</SelectItem>
-                                            <SelectItem value="ferias">Férias</SelectItem>
-                                            <SelectItem value="afastado">Afastado</SelectItem>
-                                            <SelectItem value="inativo">Inativo</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="cargo">Cargo</Label>
-                                <Input
-                                    id="cargo"
-                                    value={cargo}
-                                    onChange={(e) => setCargo(e.target.value)}
-                                    placeholder="Ex: Eletricista"
-                                    disabled={isLoading}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="departamento">Departamento</Label>
-                                <Input
-                                    id="departamento"
-                                    value={departamento}
-                                    onChange={(e) => setDepartamento(e.target.value)}
-                                    placeholder="Ex: Manutenção"
-                                    disabled={isLoading}
-                                />
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="cargo">Cargo</Label>
+                            <Input
+                                id="cargo"
+                                value={cargo}
+                                onChange={(e) => setCargo(e.target.value)}
+                                placeholder="Ex: Eletricista"
+                                disabled={isLoading}
+                            />
                         </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={isLoading} className="bg-primary-600 hover:bg-primary-700">
-                                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                {isEditing ? 'Salvar Alterações' : 'Salvar Funcionário'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                )}
+                        <div className="grid gap-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="setor">Setor (NR-1) *</Label>
+                                <NovoSetorDialog
+                                    onSuccess={(id) => {
+                                        setSetorId(id);
+                                        // Refetch local
+                                        if (empresaSelecionada) {
+                                            supabase
+                                                .from('setores')
+                                                .select('id, nome')
+                                                .eq('empresa_id', empresaSelecionada.empresa_id)
+                                                .then(({ data }) => data && setSetores(data));
+                                        }
+                                    }}
+                                    trigger={<button type="button" className="text-[10px] font-bold text-primary-600 hover:underline tracking-tight uppercase">+ Novo Setor</button>}
+                                />
+                            </div>
+                            <Select value={setorId} onValueChange={setSetorId} disabled={isLoading} required>
+                                <SelectTrigger id="setor">
+                                    <SelectValue placeholder="Selecione o setor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {setores.map(s => (
+                                        <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                                    ))}
+                                    {setores.length === 0 && (
+                                        <SelectItem value="none" disabled>Nenhum setor cadastrado</SelectItem>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-neutral-400">Obrigatório para conformidade NR-1.</p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isLoading} className="bg-primary-600 hover:bg-primary-700">
+                            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            {isEditing ? 'Salvar Alterações' : 'Salvar Funcionário'}
+                        </Button>
+                    </DialogFooter>
+                </form>
             </DialogContent>
         </Dialog>
     );

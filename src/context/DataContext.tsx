@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 
 // --- Interfaces para Compatibilidade com a UI ---
 export interface Alerta {
@@ -10,19 +11,31 @@ export interface Alerta {
     dataCriacao: string;
 }
 
+export interface Funcionario {
+    id: string;
+    nome_completo: string;
+    matricula: string;
+    status: string;
+}
+
 export interface Exame {
     id: string;
     funcionarioId: string;
     tipo: string;
     status: 'vencido' | 'pendente' | 'realizado';
+    dataRealizacao: string;
     dataVencimento: string;
 }
 
 export interface Treinamento {
     id: string;
+    funcionarioId: string;
     nr: string;
-    status: 'vencido' | 'vigente';
+    descricao: string;
+    status: 'vencido' | 'vigente' | 'agendado';
+    dataRealizacao: string;
     dataVencimento: string;
+    cargaHoraria?: number;
 }
 
 export interface Metrics {
@@ -37,41 +50,42 @@ export interface Metrics {
     pgrStatus: 'atualizado' | 'atencao' | 'vencido';
 }
 
+export interface OnboardingStatus {
+    empresaCriada: boolean;
+    setorCadastrado: boolean;
+    funcionarioCadastrado: boolean;
+    vinculoSetorEfetivado: boolean;
+    completouOnboarding: boolean;
+}
+
 interface DataContextType {
     metrics: Metrics;
     alertas: Alerta[];
     exames: Exame[];
     treinamentos: Treinamento[];
+    funcionarios: Funcionario[];
+    onboarding: OnboardingStatus;
+    isLoading: boolean;
+    refetch: () => Promise<void>;
 }
 
-// --- Mocks Iniciais ---
-const mockData: DataContextType = {
-    metrics: {
-        totalFuncionarios: 156,
-        funcionariosAtivos: 142,
-        indiceConformidade: 88,
-        alertasPendentes: 3,
-        alertasCriticos: 1,
-        examesVencidos: 5,
-        examesAVencer: 8,
-        treinamentosVencidos: 4,
-        pgrStatus: 'atencao'
-    },
-    alertas: [
-        { id: '1', titulo: 'PGR Vencendo', descricao: 'O PGR da unidade Matriz vence em 15 dias.', prioridade: 'alta', status: 'pendente', dataCriacao: new Date().toISOString() },
-        { id: '2', titulo: 'Treinamento NR-35', descricao: 'Vencimento de treinamentos de altura.', prioridade: 'critica', status: 'pendente', dataCriacao: new Date().toISOString() },
-    ],
-    exames: [],
-    treinamentos: [],
-};
+const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const DataContext = createContext<DataContextType>(mockData);
-
+// --- Provider Real ---
 export function DataProvider({ children }: { children: ReactNode }) {
-    const [data] = useState<DataContextType>(mockData);
+    const {
+        metrics,
+        alertas,
+        exames,
+        treinamentos,
+        funcionarios,
+        onboarding,
+        isLoading,
+        refetch
+    } = useDashboardMetrics();
 
     return (
-        <DataContext.Provider value={data}>
+        <DataContext.Provider value={{ metrics, alertas, exames, treinamentos, funcionarios, onboarding, isLoading, refetch }}>
             {children}
         </DataContext.Provider>
     );
@@ -79,7 +93,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
 export function useData() {
     const context = useContext(DataContext);
-    if (!context) {
+    if (context === undefined) {
         throw new Error("useData deve ser usado dentro de um DataProvider");
     }
     return context;

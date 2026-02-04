@@ -4,11 +4,12 @@ import {
     Search,
     Filter,
     MoreVertical,
-    Loader2,
     Building2,
     Plus,
     Edit,
-    Trash
+    Trash,
+    FileText,
+    Clock
 } from 'lucide-react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +23,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Empty,
+    EmptyContent,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle
+} from "@/components/ui/empty";
 
 interface Funcionario {
     id: string;
@@ -106,6 +116,26 @@ export function Funcionarios() {
         f.cargo?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const renderSkeleton = () => (
+        <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+            <div className="h-12 bg-neutral-50 border-b border-neutral-200" />
+            {[...Array(5)].map((_, i) => (
+                <div key={i} className="px-6 py-4 flex items-center justify-between border-b border-neutral-100 last:border-0">
+                    <div className="flex items-center gap-3 flex-1">
+                        <Skeleton className="w-9 h-9 rounded-full" />
+                        <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-1/4" />
+                            <Skeleton className="h-3 w-1/6" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-4 w-24 mx-4" />
+                    <Skeleton className="h-4 w-20 mx-4" />
+                    <Skeleton className="h-8 w-8 rounded-md" />
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <div className="p-6 space-y-6 animate-fade-in">
             {/* Header */}
@@ -145,50 +175,54 @@ export function Funcionarios() {
 
             {/* Content */}
             {isLoading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
-                </div>
+                renderSkeleton()
             ) : !empresaSelecionada ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
-                    <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Building2 className="w-8 h-8 text-primary-600" />
-                    </div>
-                    <h3 className="text-lg font-medium text-neutral-900 mb-1">
-                        Nenhuma empresa selecionada
-                    </h3>
-                    <p className="text-neutral-500 mb-6 max-w-sm mx-auto">
-                        Para gerenciar funcionários, você precisa primeiro criar o perfil da sua empresa.
-                    </p>
-                    <NovaEmpresaDialog
-                        onSuccess={fetchFuncionarios}
-                        trigger={
-                            <button className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2 mx-auto">
-                                <Plus className="w-4 h-4" />
-                                Criar Minha Empresa
-                            </button>
-                        }
-                    />
-                </div>
+                <Empty className="py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
+                    <EmptyHeader>
+                        <EmptyMedia variant="icon" className="bg-primary-50 text-primary-600">
+                            <Building2 />
+                        </EmptyMedia>
+                        <EmptyTitle>Nenhuma empresa selecionada</EmptyTitle>
+                        <EmptyDescription>
+                            Para gerenciar funcionários, você precisa primeiro criar o perfil da sua empresa.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                        <NovaEmpresaDialog
+                            onSuccess={fetchFuncionarios}
+                            trigger={
+                                <Button className="bg-primary-600 hover:bg-primary-700 text-white shadow-sm gap-2">
+                                    <Plus className="w-4 h-4" />
+                                    Criar Minha Empresa
+                                </Button>
+                            }
+                        />
+                    </EmptyContent>
+                </Empty>
             ) : funcionariosFiltrados.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
-                    <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="w-8 h-8 text-neutral-400" />
-                    </div>
-                    <h3 className="text-lg font-medium text-neutral-900 mb-1">
-                        {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum funcionário encontrado'}
-                    </h3>
-                    <p className="text-neutral-500 mb-6">
-                        {searchTerm ? 'Tente buscar com outros termos.' : 'Comece cadastrando os colaboradores da empresa.'}
-                    </p>
+                <Empty className="py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
+                    <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                            <Users className="text-neutral-400" />
+                        </EmptyMedia>
+                        <EmptyTitle>
+                            {searchTerm ? 'Nenhum resultado encontrado' : 'Que tal cadastrar seu primeiro colaborador?'}
+                        </EmptyTitle>
+                        <EmptyDescription>
+                            {searchTerm
+                                ? 'Tente buscar com outros termos.'
+                                : 'Os funcionários são a base da sua gestão de SST. Cadastre o primeiro para liberar o PGR e controle de exames.'}
+                        </EmptyDescription>
+                    </EmptyHeader>
                     {!searchTerm && (
-                        <div className="flex justify-center">
+                        <EmptyContent>
                             <Button onClick={handleNew} className="bg-primary-600 hover:bg-primary-700 text-white shadow-sm gap-2">
                                 <Plus className="w-4 h-4" />
                                 Novo Funcionário
                             </Button>
-                        </div>
+                        </EmptyContent>
                     )}
-                </div>
+                </Empty>
             ) : (
                 <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
                     <table className="w-full text-left text-sm">

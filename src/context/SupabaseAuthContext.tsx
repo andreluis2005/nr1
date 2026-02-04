@@ -29,6 +29,7 @@ interface EmpresaVinculada {
     logo_url: string | null;
     plano: string;
     status: string;
+    empresa_pai_id?: string | null;
   };
 }
 
@@ -155,11 +156,20 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       // 0. Obter usuário mais recente para metadados se necessário
       let userForMetadata = currentUser || user;
 
-      // Se estamos no contexto de onboarding (carregando dados iniciais), 
-      // buscar do servidor para garantir metadados frescos
-      if (!userForMetadata?.user_metadata?.empresa_nome) {
-        const { data: { user: freshUser } } = await supabase.auth.getUser();
-        if (freshUser) userForMetadata = freshUser;
+      console.log('[Auth] Carregando dados para usuário:', userId);
+      console.log('[Auth] Metadados atuais:', userForMetadata?.user_metadata);
+
+      // Se temos um usuário mas faltam metadados essenciais, tentar buscar dados frescos do servidor
+      if (userId && (!userForMetadata?.user_metadata || !userForMetadata.user_metadata.empresa_nome)) {
+        console.log('[Auth] Metadados incompletos, buscando do servidor...');
+        const { data: { user: freshUser }, error: userError } = await supabase.auth.getUser();
+        if (freshUser) {
+          userForMetadata = freshUser;
+          setUser(freshUser); // Atualizar estado global com dados frescos
+          console.log('[Auth] Dados frescos obtidos:', freshUser.user_metadata);
+        } else if (userError) {
+          console.error('[Auth] Erro ao buscar dados frescos do usuário:', userError);
+        }
       }
 
       // Carregar perfil - com fallback se falhar (erro 500 ou RLS)
@@ -223,24 +233,40 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
           setEmpresas(empresasFormatadas);
 
           // LÓGICA DE ONBOARDING: Se não tem nenhuma empresa, mas tem metadados de empresa, cria agora
-          if (empresasFormatadas.length === 0 && userForMetadata?.user_metadata?.empresa_nome) {
-            console.log('[Auth] Usuário sem empresa detectado, iniciando criação via metadados...', userForMetadata.user_metadata.empresa_nome);
+          const metaEmpresaNome = userForMetadata?.user_metadata?.empresa_nome || userForMetadata?.user_metadata?.nome_empresa;
+          const metaEmpresaCnpj = userForMetadata?.user_metadata?.empresa_cnpj || userForMetadata?.user_metadata?.cnpj;
+
+          if (empresasFormatadas.length === 0 && metaEmpresaNome) {
+            console.log('[Auth] ONBOARDING: Usuário sem empresa detectado. Criando para:', metaEmpresaNome);
+            toast.info('Configurando sua empresa: ' + metaEmpresaNome);
             try {
-              const { error: rpcError } = await (supabase as any)
+              const { data: novaEmpresaId, error: rpcError } = await (supabase as any)
                 .rpc('criar_empresa_rpc', {
-                  p_nome_fantasia: userForMetadata.user_metadata.empresa_nome,
-                  p_cnpj: userForMetadata.user_metadata.empresa_cnpj || null
+                  p_nome_fantasia: metaEmpresaNome,
+                  p_cnpj: metaEmpresaCnpj || null
                 });
 
-              if (rpcError) throw rpcError;
+              if (rpcError) {
+                console.error('[Auth] Erro no RPC criar_empresa_rpc:', rpcError);
+                if (rpcError.code === '23505') {
+                  toast.error('Este CNPJ já está cadastrado em outra conta.');
+                } else {
+                  toast.error('Erro ao configurar sua empresa automaticamente.');
+                }
+                throw rpcError;
+              }
 
-              console.log('[Auth] Empresa criada com sucesso via onboarding');
-              // Recarregar empresas após criação e retornar pra evitar selecionar null
-              // Passamos o userForMetadata para manter a consistência
+              console.log('[Auth] Empresa criada com sucesso via onboarding. ID:', novaEmpresaId);
+              toast.success('Empresa configurada com sucesso!');
+
+              // Pequena pausa para garantir que o BD processou o vínculo
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              // Recarregar empresas após criação
               await carregarDadosUsuario(userId, userForMetadata);
               return;
             } catch (rpcErr) {
-              console.error('[Auth] Erro ao criar empresa no onboarding:', rpcErr);
+              console.error('[Auth] Falha crítica no onboarding:', rpcErr);
             }
           }
 

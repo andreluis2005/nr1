@@ -27,6 +27,8 @@ import { Funcionarios } from '@/pages/Funcionarios';
 import { Toaster } from '@/components/ui/sonner';
 import { DataProvider } from '@/context/DataContext';
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
+
 // Layout do aplicativo (com sidebar) - apenas para usuários autenticados
 function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -45,6 +47,7 @@ function AppLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header onLogout={handleLogout} usuario={perfil} />
         <main className="flex-1 overflow-y-auto">
+          <Breadcrumbs />
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route

@@ -5,25 +5,15 @@ import {
   Calendar,
   FileText,
   Stethoscope,
-  GraduationCap,
-  TrendingUp,
-  TrendingDown,
   ArrowUpRight,
-  Activity,
-  Clock,
   CheckCircle2,
-  AlertCircle,
-  ChevronRight,
   Loader2,
-  Database
+  Sparkles
 } from 'lucide-react';
-import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useData } from '@/context/DataContext';
 import { useState } from 'react';
-
-import { NovaEmpresaDialog } from "@/components/empresas/NovaEmpresaDialog";
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import { Plus, Building2 } from "lucide-react";
-
+import { OnboardingDrawer } from "@/components/dashboard/OnboardingDrawer";
 import { MetricCard } from "@/components/MetricCard";
 import type { LucideIcon } from 'lucide-react';
 
@@ -90,8 +80,8 @@ function AlertItem({ alerta }: AlertItemProps) {
   return (
     <div className="flex gap-3 p-3 rounded-lg border border-neutral-100 hover:border-neutral-200 transition-colors bg-white">
       <div className={`w-1 shrink-0 rounded-full ${alerta.prioridade === 'critica' ? 'bg-red-500' :
-          alerta.prioridade === 'alta' ? 'bg-orange-500' :
-            alerta.prioridade === 'media' ? 'bg-yellow-500' : 'bg-blue-500'
+        alerta.prioridade === 'alta' ? 'bg-orange-500' :
+          alerta.prioridade === 'media' ? 'bg-yellow-500' : 'bg-blue-500'
         }`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
@@ -111,17 +101,25 @@ function AlertItem({ alerta }: AlertItemProps) {
 
 export function Dashboard() {
   const { empresaSelecionada } = useSupabaseAuth();
-  // Consome APENAS dados reais do hook
   const {
     metrics,
     alertas,
     exames,
     treinamentos,
-    isLoading,
-    error
-  } = useDashboardMetrics();
+    onboarding,
+    isLoading
+  } = useData();
 
   const [periodoSelecionado, setPeriodoSelecionado] = useState('30d');
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin mb-4" />
+        <p className="text-neutral-500 font-medium">Carregando indicadores...</p>
+      </div>
+    );
+  }
 
   const alertasLista = Array.isArray(alertas) ? alertas : [];
   const alertasRecentes = alertasLista.filter(a => a.status !== 'resolvido').slice(0, 4);
@@ -141,121 +139,36 @@ export function Dashboard() {
     return 'red' as const;
   };
 
-  // Gráfico zerado se não houver conformidade real calculada
   const dadosGrafico = [
-    { mes: 'Ago', valor: 0, meta: 85 },
-    { mes: 'Set', valor: 0, meta: 85 },
-    { mes: 'Out', valor: 0, meta: 90 },
-    { mes: 'Nov', valor: 0, meta: 90 },
-    { mes: 'Dez', valor: 0, meta: 95 },
     { mes: 'Jan', valor: metrics.indiceConformidade, meta: 95 }
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
-        <Loader2 className="w-8 h-8 text-primary-600 animate-spin mb-4" />
-        <p className="text-neutral-500 font-medium">Carregando indicadores...</p>
-      </div>
-    );
-  }
-
-  // Onboarding: Sem empresa selecionada
-  // O usuário precisa criar uma empresa antes de qualquer coisa
-  if (!isLoading && !empresaSelecionada) {
-    return (
-      <div className="p-6 animate-fade-in">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Bem-vindo ao NR1 Pro</h1>
-            <p className="text-sm text-neutral-500 mt-1">Sua plataforma de gestão de SST</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-neutral-200 border-dashed">
-          <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mb-6">
-            <Building2 className="w-10 h-10 text-primary-600" />
-          </div>
-          <h2 className="text-xl font-semibold text-neutral-900 mb-3">
-            Vamos configurar seu ambiente
-          </h2>
-          <p className="text-neutral-500 text-center max-w-md mb-8">
-            Para começar a gerenciar funcionários e documentos, você precisa criar o perfil da sua empresa. É rápido e fácil.
-          </p>
-
-          <NovaEmpresaDialog
-            trigger={
-              <button
-                className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/20 flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Criar Minha Empresa
-              </button>
-            }
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Estado vazio global se não houver funcionários cadastrados
-  // (Assume-se que funcionários são a base para qualquer métrica de SST)
-  if (!isLoading && metrics.totalFuncionarios === 0) {
-    return (
-      <div className="p-6 animate-fade-in">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Dashboard</h1>
-            <p className="text-sm text-neutral-500 mt-1">Visão geral da conformidade com a NR-1</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-neutral-200 border-dashed">
-          <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-4">
-            <Database className="w-8 h-8 text-neutral-400" />
-          </div>
-          <h2 className="text-lg font-semibold text-neutral-900 mb-2">
-            Nenhum dado encontrado
-          </h2>
-          <p className="text-neutral-500 text-center max-w-md mb-6">
-            Cadastre funcionários e exames para visualizar os indicadores de conformidade NR-1.
-          </p>
-          <a
-            href="#/app/funcionarios"
-            className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            Cadastrar Funcionário
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6 animate-fade-in">
+      <OnboardingDrawer />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">
+            Olá, {empresaSelecionada?.empresa?.nome_fantasia || 'Bem-vindo'}! 🚀
+          </h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Visão geral da conformidade com a NR-1
+            Sua conformidade SST em tempo real.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={periodoSelecionado}
-            onChange={(e) => setPeriodoSelecionado(e.target.value)}
-            className="px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-          >
-            <option value="7d">Últimos 7 dias</option>
-            <option value="30d">Últimos 30 dias</option>
-            <option value="90d">Últimos 3 meses</option>
-            <option value="12m">Último ano</option>
-          </select>
-          <button className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm shadow-primary-500/20">
-            Exportar Relatório
-          </button>
-        </div>
+
+        {!onboarding.completouOnboarding && (
+          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-900 uppercase">Configuração Pendente</p>
+              <p className="text-[10px] text-amber-700">Clique no guia à direita para concluir seu setup.</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Metrics Grid */}
@@ -303,20 +216,10 @@ export function Dashboard() {
               <h2 className="text-lg font-semibold text-neutral-900">Evolução da Conformidade</h2>
               <p className="text-sm text-neutral-500">Comparativo com meta estabelecida</p>
             </div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-success-500" />
-                <span className="text-neutral-600">Realizado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-primary-400/50" />
-                <span className="text-neutral-600">Meta</span>
-              </div>
-            </div>
           </div>
 
           {/* Chart */}
-          <div className="h-64 flex items-end justify-between gap-3">
+          <div className="h-64 flex items-end justify-between gap-3 px-4">
             {dadosGrafico.map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div className="w-full flex items-end justify-center gap-1 h-52">
@@ -339,13 +242,11 @@ export function Dashboard() {
 
         {/* Status Cards */}
         <div className="space-y-4">
-          {/* PGR Status */}
           <StatusCard
             title="Status do PGR"
             subtitle="Programa de Gerenciamento de Riscos"
             icon={FileText}
             color="bg-accent-purple/10 text-accent-purple"
-            action={{ label: 'Ver detalhes', href: '#/app/pgr' }}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -354,17 +255,14 @@ export function Dashboard() {
                   {metrics.pgrStatus === 'atualizado' ? 'Atualizado' : 'Revisão Pendente'}
                 </span>
               </div>
-              <span className="text-xs text-neutral-400">v2.3</span>
             </div>
           </StatusCard>
 
-          {/* Exames Status */}
           <StatusCard
             title="Exames Ocupacionais"
             subtitle="Controle de saúde dos colaboradores"
             icon={Stethoscope}
             color="bg-primary-500/10 text-primary-600"
-            action={{ label: 'Gerenciar exames', href: '#/app/exames' }}
           >
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-danger-50 rounded-lg p-2 text-center">
@@ -383,52 +281,13 @@ export function Dashboard() {
               </div>
             </div>
           </StatusCard>
-
-          {/* Treinamentos Status */}
-          <StatusCard
-            title="Treinamentos"
-            subtitle="Capacitação em Normas Regulamentadoras"
-            icon={GraduationCap}
-            color="bg-warning-500/10 text-warning-600"
-            action={{ label: 'Ver treinamentos', href: '#/app/treinamentos' }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-2xl font-semibold text-neutral-900">
-                    {treinamentos.filter(t => t.status === 'vigente').length}
-                  </p>
-                  <p className="text-xs text-neutral-500">Vigentes</p>
-                </div>
-                <div className="w-px h-10 bg-neutral-200" />
-                <div>
-                  <p className="text-2xl font-semibold text-danger-600">
-                    {metrics.treinamentosVencidos}
-                  </p>
-                  <p className="text-xs text-neutral-500">Vencidos</p>
-                </div>
-              </div>
-            </div>
-          </StatusCard>
         </div>
       </div>
 
-      {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Alertas Recentes */}
         <div className="bg-white rounded-xl border border-neutral-150">
           <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Alertas Recentes</h2>
-              <p className="text-sm text-neutral-500">Itens que precisam de atenção imediata</p>
-            </div>
-            <a
-              href="#/app/alertas"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 group"
-            >
-              Ver todos
-              <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
+            <h2 className="text-lg font-semibold text-neutral-900">Alertas Recentes</h2>
           </div>
           <div className="p-5 space-y-3">
             {alertasRecentes.length > 0 ? (
@@ -437,63 +296,32 @@ export function Dashboard() {
               ))
             ) : (
               <div className="text-center py-8">
-                <div className="w-12 h-12 bg-success-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 className="w-6 h-6 text-success-500" strokeWidth={1.5} />
-                </div>
-                <p className="text-sm text-neutral-600 font-medium">Tudo em ordem!</p>
-                <p className="text-xs text-neutral-400 mt-1">Nenhum alerta pendente</p>
+                <p className="text-sm text-neutral-500">Nenhum alerta pendente</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Exames Próximos */}
         <div className="bg-white rounded-xl border border-neutral-150">
           <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-900">Exames a Vencer</h2>
-              <p className="text-sm text-neutral-500">Próximos 30 dias</p>
-            </div>
-            <a
-              href="#/app/exames"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1 group"
-            >
-              Ver todos
-              <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </a>
+            <h2 className="text-lg font-semibold text-neutral-900">Exames a Vencer</h2>
           </div>
-          <div className="p-0">
+          <div className="p-5">
             {examesProximos.length > 0 ? (
-              <div className="divide-y divide-neutral-100">
+              <div className="space-y-3">
                 {examesProximos.map((exame) => (
-                  <div key={exame.id} className="p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-primary-50 rounded-lg flex items-center justify-center">
-                        <Stethoscope className="w-4 h-4 text-primary-600" strokeWidth={1.5} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">{exame.funcionarioId}</p>
-                        <p className="text-xs text-neutral-500">{exame.tipo}</p>
-                      </div>
+                  <div key={exame.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{exame.tipo}</p>
+                      <p className="text-xs text-neutral-500">{new Date(exame.dataVencimento).toLocaleDateString()}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-danger-600">
-                        {new Date(exame.dataVencimento).toLocaleDateString('pt-BR')}
-                      </p>
-                      <p className="text-2xs text-neutral-400">
-                        {Math.ceil((new Date(exame.dataVencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} dias
-                      </p>
-                    </div>
+                    <span className="text-xs font-bold text-danger-600 tracking-tight">Vence em breve</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10">
-                <div className="w-12 h-12 bg-success-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <CheckCircle2 className="w-6 h-6 text-success-500" strokeWidth={1.5} />
-                </div>
-                <p className="text-sm text-neutral-600 font-medium">Nenhum exame próximo do vencimento</p>
-                <p className="text-xs text-neutral-400 mt-1">Todos os exames estão em dia</p>
+              <div className="text-center py-8 font-medium">
+                Tudo em dia!
               </div>
             )}
           </div>

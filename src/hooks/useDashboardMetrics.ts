@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import type { Metrics, Alerta, Exame, Treinamento, Funcionario, OnboardingStatus } from '@/context/DataContext';
+import type { Metrics, Alerta, Exame, Treinamento, OnboardingStatus } from '@/context/DataContext';
 
 // Dados de fallback caso não haja empresa selecionada ou erro
 const fallbackMetrics: Metrics = {
@@ -26,6 +26,8 @@ const defaultOnboarding: OnboardingStatus = {
     setorCadastrado: false,
     funcionarioCadastrado: false,
     vinculoSetorEfetivado: false,
+    treinamentosPlanejados: false,
+    inventarioGerado: false,
     completouOnboarding: false
 };
 
@@ -208,7 +210,12 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 setorCadastrado: (countSetores || 0) > 0,
                 funcionarioCadastrado: totalFuncionarios > 0,
                 vinculoSetorEfetivado: hasVinculo,
-                completouOnboarding: (countSetores || 0) > 0 && totalFuncionarios > 0 && hasVinculo
+                treinamentosPlanejados: false, // Implementar quando houver tabela
+                inventarioGerado: false, // Implementar quando houver tabela
+                completouOnboarding: (countSetores || 0) > 0 &&
+                    totalFuncionarios > 0 &&
+                    hasVinculo &&
+                    false // Enquanto houver passos manuais pendentes
             };
 
             setOnboarding(onboardingStatus);

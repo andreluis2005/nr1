@@ -75,7 +75,7 @@ export function OnboardingDrawer() {
             id: 'treinamentos',
             title: 'Planejar Treinamentos',
             description: 'Defina as NRs iniciais dos colaboradores.',
-            completed: false,
+            completed: onboarding.treinamentosPlanejados,
             icon: GraduationCap,
             disabled: !onboarding.vinculoSetorEfetivado,
             action: <Button size="sm" variant="outline" disabled={!onboarding.vinculoSetorEfetivado}>Agendar</Button>
@@ -84,15 +84,17 @@ export function OnboardingDrawer() {
             id: 'inventario',
             title: 'Inventário de Riscos',
             description: 'Gere o primeiro rascunho do seu PGR.',
-            completed: false,
+            completed: onboarding.inventarioGerado,
             icon: FileSearch,
             disabled: !onboarding.vinculoSetorEfetivado,
             action: <Button size="sm" variant="outline" disabled={!onboarding.vinculoSetorEfetivado}>Gerar</Button>
         }
     ];
 
-    const completedCount = Object.values(onboarding).filter(v => v === true && typeof v === 'boolean').length - 1;
-    const progress = (completedCount / 4) * 100;
+    const completedCount = Object.values(onboarding).filter(v => v === true && typeof v === 'boolean').length;
+    // Se completouOnboarding estiver incluso na contagem, subtraímos
+    const finalCount = onboarding.completouOnboarding ? completedCount - 1 : completedCount;
+    const progress = (finalCount / 6) * 100;
 
     if (onboarding.completouOnboarding && !isOpen) return null;
 

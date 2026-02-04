@@ -55,6 +55,8 @@ export interface OnboardingStatus {
     setorCadastrado: boolean;
     funcionarioCadastrado: boolean;
     vinculoSetorEfetivado: boolean;
+    treinamentosPlanejados: boolean;
+    inventarioGerado: boolean;
     completouOnboarding: boolean;
 }
 

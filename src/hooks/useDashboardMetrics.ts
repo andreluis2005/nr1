@@ -176,12 +176,26 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
             if (setoresError) throw setoresError;
 
-            const { data: riscosData, error: riscosError } = await supabase
-                .from('riscos')
-                .select('*')
-                .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
+            let riscosData: any[] = [];
+            try {
+                const { data: rData, error: rError } = await supabase
+                    .from('riscos')
+                    .select('*')
+                    .eq('empresa_id', empresaId);
 
-            if (riscosError) throw riscosError;
+                if (rError) {
+                    // Se a tabela não existir (404/42P01), apenas logamos e seguimos com array vazio
+                    if (rError.code === '42P01' || (rError as any).status === 404) {
+                        console.warn('[useDashboardMetrics] Tabela "riscos" não encontrada. Módulo ainda não migrado?');
+                    } else {
+                        throw rError;
+                    }
+                } else {
+                    riscosData = rData || [];
+                }
+            } catch (e) {
+                console.warn('[useDashboardMetrics] Erro ao buscar riscos:', e);
+            }
 
             const setoresFormatados: Setor[] = (setoresData || []).map(s => ({
                 id: s.id,

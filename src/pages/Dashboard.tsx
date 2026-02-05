@@ -5,15 +5,13 @@ import {
   Calendar,
   FileText,
   Stethoscope,
-  ArrowUpRight,
-  CheckCircle2,
-  Loader2,
-  Sparkles
+  Loader2
 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useState } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { OnboardingDrawer } from "@/components/dashboard/OnboardingDrawer";
+import { StatusJornada } from "@/components/dashboard/StatusJornada";
 import { MetricCard } from "@/components/MetricCard";
 import type { LucideIcon } from 'lucide-react';
 
@@ -105,12 +103,9 @@ export function Dashboard() {
     metrics,
     alertas,
     exames,
-    treinamentos,
-    onboarding,
     isLoading
   } = useData();
 
-  const [periodoSelecionado, setPeriodoSelecionado] = useState('30d');
 
   if (isLoading) {
     return (
@@ -147,6 +142,8 @@ export function Dashboard() {
     <div className="p-6 space-y-6 animate-fade-in">
       <OnboardingDrawer />
 
+      <StatusJornada />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -157,18 +154,6 @@ export function Dashboard() {
             Sua conformidade SST em tempo real.
           </p>
         </div>
-
-        {!onboarding.completouOnboarding && (
-          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-amber-900 uppercase">Configuração Pendente</p>
-              <p className="text-[10px] text-amber-700">Clique no guia à direita para concluir seu setup.</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Metrics Grid */}
@@ -181,6 +166,7 @@ export function Dashboard() {
           trendValue="+12%"
           icon={Users}
           color="blue"
+          onClick={() => window.location.hash = '#/app/funcionarios'}
         />
         <MetricCard
           title="Índice de Conformidade"
@@ -190,6 +176,7 @@ export function Dashboard() {
           trendValue="+5%"
           icon={ShieldCheck}
           color={getCorConformidade(metrics.indiceConformidade)}
+          onClick={() => window.location.hash = '#/app/pgr'}
         />
         <MetricCard
           title="Alertas Pendentes"
@@ -197,6 +184,7 @@ export function Dashboard() {
           subtitle={`${metrics.alertasCriticos} críticos`}
           icon={AlertTriangle}
           color={metrics.alertasCriticos > 0 ? 'red' : 'amber'}
+          onClick={() => window.location.hash = '#/app/alertas'}
         />
         <MetricCard
           title="Próximos Vencimentos"
@@ -204,6 +192,7 @@ export function Dashboard() {
           subtitle={`${metrics.examesVencidos} vencidos`}
           icon={Calendar}
           color={metrics.examesVencidos > 0 ? 'red' : 'amber'}
+          onClick={() => window.location.hash = '#/app/exames'}
         />
       </div>
 

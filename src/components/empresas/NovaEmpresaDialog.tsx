@@ -65,6 +65,7 @@ export function NovaEmpresaDialog({
 
                 if (semAlteracao) {
                     // Se não houve alteração, apenas fecha e avança
+                    toast.info("Dados confirmados");
                     setOpen(false);
                     if (onSuccess) onSuccess();
                     return;

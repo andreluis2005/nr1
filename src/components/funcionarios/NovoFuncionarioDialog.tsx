@@ -43,7 +43,7 @@ interface NovoFuncionarioDialogProps {
 }
 
 export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: controlledOpen, onOpenChange, trigger }: NovoFuncionarioDialogProps) {
-    const { empresaSelecionada, criarEmpresa } = useSupabaseAuth();
+    const { empresaSelecionada } = useSupabaseAuth();
     const [internalOpen, setInternalOpen] = useState(false);
 
     const isControlled = controlledOpen !== undefined;
@@ -103,7 +103,12 @@ export function NovoFuncionarioDialog({ onSuccess, funcionarioToEdit, open: cont
         }
 
         if (!nome.trim()) {
-            toast.error("Nome é obrigatório");
+            toast.error("O nome completo é obrigatório.");
+            return;
+        }
+
+        if (!setorId || setorId === 'none') {
+            toast.error("O setor é obrigatório para conformidade regulatória.");
             return;
         }
 

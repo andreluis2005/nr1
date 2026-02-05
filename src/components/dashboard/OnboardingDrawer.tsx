@@ -46,6 +46,7 @@ export function OnboardingDrawer() {
             action: (
                 <NovaEmpresaDialog
                     mode={hasCompanyContext ? 'verify' : 'create'}
+                    onSuccess={refetch}
                     trigger={<Button size="sm" variant="outline">{hasCompanyContext ? 'Verificar' : 'Começar'}</Button>}
                 />
             )

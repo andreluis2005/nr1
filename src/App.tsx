@@ -24,6 +24,7 @@ import { LandingPage } from '@/pages/LandingPage';
 import { Login } from '@/pages/Login';
 import { Signup } from '@/pages/Signup';
 import { Funcionarios } from '@/pages/Funcionarios';
+import { Setores } from '@/pages/Setores';
 import { Toaster } from '@/components/ui/sonner';
 import { DataProvider } from '@/context/DataContext';
 
@@ -59,6 +60,7 @@ function AppLayout() {
               }
             />
             <Route path="/pgr" element={<PGR />} />
+            <Route path="/setores" element={<Setores />} />
             <Route path="/funcionarios" element={<Funcionarios />} />
             <Route path="/exames" element={<Exames />} />
             <Route path="/treinamentos" element={<Treinamentos />} />

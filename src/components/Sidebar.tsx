@@ -16,7 +16,8 @@ import {
   CheckSquare,
   Send,
   Building2,
-  Users
+  Users,
+  LayoutGrid
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -36,6 +37,7 @@ const menuItems: MenuItem[] = [
   { path: '/app', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/app/analytics', icon: TrendingUp, label: 'Analytics' },
   { path: '/app/funcionarios', icon: Users, label: 'Funcionários' },
+  { path: '/app/setores', icon: LayoutGrid, label: 'Ambientes (Setores)' },
   { path: '/app/pgr', icon: FileText, label: 'PGR' },
   { path: '/app/exames', icon: Stethoscope, label: 'Exames' },
   { path: '/app/treinamentos', icon: GraduationCap, label: 'Treinamentos' },

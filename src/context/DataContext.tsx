@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 
 // --- Interfaces para Compatibilidade com a UI ---
@@ -38,6 +38,25 @@ export interface Treinamento {
     cargaHoraria?: number;
 }
 
+export interface Setor {
+    id: string;
+    nome: string;
+    descricao?: string;
+    created_at: string;
+}
+
+export interface Risco {
+    id: string;
+    setor_id: string;
+    categoria: 'fisico' | 'quimico' | 'biologico' | 'ergonomico' | 'acidente';
+    nome: string;
+    descricao?: string;
+    severidade: number;
+    probabilidade: number;
+    medidas_controle?: string;
+    status: string;
+}
+
 export interface Metrics {
     totalFuncionarios: number;
     funcionariosAtivos: number;
@@ -54,9 +73,6 @@ export interface OnboardingStatus {
     empresaCriada: boolean;
     setorCadastrado: boolean;
     funcionarioCadastrado: boolean;
-    vinculoSetorEfetivado: boolean;
-    treinamentosPlanejados: boolean;
-    inventarioGerado: boolean;
     completouOnboarding: boolean;
 }
 
@@ -66,28 +82,48 @@ interface DataContextType {
     exames: Exame[];
     treinamentos: Treinamento[];
     funcionarios: Funcionario[];
+    setores: Setor[];
+    riscos: Risco[];
     onboarding: OnboardingStatus;
     isLoading: boolean;
     refetch: () => Promise<void>;
+    isOnboardingOpen: boolean;
+    setIsOnboardingOpen: (open: boolean) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 // --- Provider Real ---
 export function DataProvider({ children }: { children: ReactNode }) {
+    const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
     const {
         metrics,
         alertas,
         exames,
         treinamentos,
         funcionarios,
+        setores,
+        riscos,
         onboarding,
         isLoading,
         refetch
     } = useDashboardMetrics();
 
     return (
-        <DataContext.Provider value={{ metrics, alertas, exames, treinamentos, funcionarios, onboarding, isLoading, refetch }}>
+        <DataContext.Provider value={{
+            metrics,
+            alertas,
+            exames,
+            treinamentos,
+            funcionarios,
+            setores,
+            riscos,
+            onboarding,
+            isLoading,
+            refetch,
+            isOnboardingOpen,
+            setIsOnboardingOpen
+        }}>
             {children}
         </DataContext.Provider>
     );

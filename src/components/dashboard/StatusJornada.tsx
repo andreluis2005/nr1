@@ -1,0 +1,153 @@
+import {
+    CheckCircle2,
+    ArrowRight,
+    ShieldAlert,
+    FileCheck,
+    Building2
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useData } from '@/context/DataContext';
+
+export function StatusJornada() {
+    const { onboarding, metrics, riscos, setIsOnboardingOpen } = useData();
+    const risksMapped = (riscos || []).length > 0;
+
+    const journeySteps = [
+        {
+            id: 'estrutura',
+            label: 'Estrutura Inicial',
+            status: onboarding.completouOnboarding ? 'done' : 'doing',
+            icon: Building2,
+            description: onboarding.completouOnboarding ? 'Base cadastrada com sucesso.' : 'Configure empresa, setores e equipe.',
+            action: !onboarding.completouOnboarding ? 'Abrir Guia' : null
+        },
+        {
+            id: 'riscos',
+            label: 'Mapeamento de Riscos',
+            status: onboarding.completouOnboarding
+                ? (metrics.indiceConformidade > 0 && risksMapped ? 'done' : 'doing')
+                : 'locked',
+            icon: ShieldAlert,
+            description: risksMapped ? 'Identificação de perigos realizada.' : 'Identifique perigos e riscos por ambiente.',
+            action: onboarding.completouOnboarding ? 'Mapear Riscos' : null
+        },
+        {
+            id: 'gro',
+            label: 'Inventário GRO / PGR',
+            status: metrics.pgrStatus === 'atualizado' ? 'done' : 'locked',
+            icon: FileCheck,
+            description: 'Gere os documentos obrigatórios da NR-1.',
+            action: metrics.pgrStatus === 'atualizado' ? 'Gerar PDF' : null
+        }
+    ];
+
+    return (
+        <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+            <div className="bg-neutral-50 px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-primary-600" />
+                        Copiloto da Jornada NR-1
+                    </h3>
+                    <p className="text-xs text-neutral-500">Acompanhe sua evolução regulatória em tempo real.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Maturidade</span>
+                    <div className="flex gap-1">
+                        {[1, 2, 3].map((i) => (
+                            <div
+                                key={i}
+                                className={`w-3 h-1.5 rounded-full ${i === 1 && onboarding.completouOnboarding ? 'bg-success-500' :
+                                    i === 2 && metrics.pgrStatus === 'atualizado' ? 'bg-success-500' :
+                                        'bg-neutral-200'
+                                    }`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {journeySteps.map((step, idx) => {
+                        const isDone = step.status === 'done';
+                        const isDoing = step.status === 'doing';
+                        const isLocked = step.status === 'locked';
+
+                        return (
+                            <div key={step.id} className="relative group">
+                                <div className={`flex items-start gap-4 p-4 rounded-xl border transition-all duration-300 ${isDone ? 'bg-success-50/30 border-success-100' :
+                                    isDoing ? 'bg-primary-50/30 border-primary-100 ring-1 ring-primary-100' :
+                                        'bg-neutral-50/50 border-neutral-100'
+                                    }`}>
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isDone ? 'bg-success-500 text-white' :
+                                        isDoing ? 'bg-primary-600 text-white' :
+                                            'bg-neutral-200 text-neutral-400'
+                                        }`}>
+                                        {isDone ? <CheckCircle2 className="w-6 h-6" /> : <step.icon className="w-5 h-5" />}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h4 className={`text-sm font-bold truncate ${isLocked ? 'text-neutral-400' : 'text-neutral-900'
+                                                }`}>
+                                                {step.label}
+                                            </h4>
+                                            {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-success-600" />}
+                                        </div>
+                                        <p className="text-[11px] text-neutral-500 leading-snug mb-3">
+                                            {step.description}
+                                        </p>
+
+                                        {step.action && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-7 px-2 text-[10px] font-bold uppercase tracking-tight gap-1 hover:bg-white ${isDoing ? 'text-primary-600' : 'text-neutral-600'
+                                                    }`}
+                                                onClick={() => {
+                                                    if (step.id === 'estrutura') setIsOnboardingOpen(true);
+                                                    if (step.id === 'riscos') window.location.hash = '#/app/setores';
+                                                    if (step.id === 'gro') window.location.hash = '#/app/pgr';
+                                                }}
+                                            >
+                                                {step.action}
+                                                <ArrowRight className="w-3 h-3" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {idx < 2 && (
+                                    <div className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                                        <ArrowRight className={`w-4 h-4 ${isDone ? 'text-success-300' : 'text-neutral-200'}`} />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="px-6 py-3 bg-neutral-50/50 border-t border-neutral-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="w-5 h-5 rounded-full border-2 border-white bg-neutral-200 flex items-center justify-center overflow-hidden">
+                                <ShieldAlert className="w-2.5 h-2.5 text-neutral-400" />
+                            </div>
+                        ))}
+                    </div>
+                    <span className="text-[10px] text-neutral-500 font-medium italic">
+                        "O GRO deve ser mantido de forma contínua conforme NR-1.02"
+                    </span>
+                </div>
+                {!onboarding.completouOnboarding && (
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                        PENDENTE: CADASTRO BASE
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+}

@@ -59,6 +59,17 @@ export function NovaEmpresaDialog({
 
         try {
             if (mode === 'verify' && empresaSelecionada?.empresa_id) {
+                const dadosOriginais = empresaSelecionada.empresa;
+                const semAlteracao = nomeEmpresa === dadosOriginais.nome_fantasia &&
+                    cnpjEmpresa === (dadosOriginais.cnpj || '');
+
+                if (semAlteracao) {
+                    // Se não houve alteração, apenas fecha e avança
+                    setOpen(false);
+                    if (onSuccess) onSuccess();
+                    return;
+                }
+
                 const ok = await atualizarEmpresa(empresaSelecionada.empresa_id, {
                     nome: nomeEmpresa,
                     cnpj: cnpjEmpresa

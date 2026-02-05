@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
     Sheet,
     SheetContent,
@@ -10,13 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
     Sparkles,
-    GraduationCap,
-    FileSearch,
     CheckCircle2,
     Building2,
     LayoutGrid,
     Users,
-    ArrowRight
+    AlertCircle
 } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { NovoSetorDialog } from "@/components/setores/NovoSetorDialog";
@@ -24,82 +22,59 @@ import { NovoFuncionarioDialog } from "@/components/funcionarios/NovoFuncionario
 import { NovaEmpresaDialog } from "@/components/empresas/NovaEmpresaDialog";
 
 export function OnboardingDrawer() {
-    const { onboarding, refetch, isLoading } = useData();
-    const [isOpen, setIsOpen] = useState(false);
+    const { onboarding, refetch, isLoading, isOnboardingOpen, setIsOnboardingOpen } = useData();
 
     // Abrir automaticamente se o onboarding não estiver completo
     useEffect(() => {
         if (!isLoading && !onboarding.completouOnboarding) {
-            const timer = setTimeout(() => setIsOpen(true), 1000);
+            const timer = setTimeout(() => setIsOnboardingOpen(true), 1000);
             return () => clearTimeout(timer);
         }
-    }, [onboarding.completouOnboarding, isLoading]);
+    }, [onboarding.completouOnboarding, isLoading, setIsOnboardingOpen]);
 
     const steps = [
         {
             id: 'empresa',
-            title: 'Perfil da Empresa',
-            description: 'Dados básicos da sua organização.',
+            title: 'Confirmação da Empresa',
+            description: 'Verifique se os dados básicos estão corretos.',
             completed: onboarding.empresaCriada,
             icon: Building2,
-            action: <NovaEmpresaDialog trigger={<Button size="sm" variant="outline">Configurar</Button>} />
+            action: (
+                <NovaEmpresaDialog
+                    mode={onboarding.empresaCriada ? 'verify' : 'create'}
+                    trigger={<Button size="sm" variant="outline">{onboarding.empresaCriada ? 'Verificar' : 'Começar'}</Button>}
+                />
+            )
         },
         {
             id: 'setor',
-            title: 'Estrutura de Setores',
-            description: 'Cadastre os locais de trabalho (NR-1).',
+            title: 'Ambientes de Trabalho (Setores)',
+            description: 'Os setores são onde os riscos acontecem. Cadastre ao menos um.',
             completed: onboarding.setorCadastrado,
             icon: LayoutGrid,
             disabled: !onboarding.empresaCriada,
-            action: <NovoSetorDialog onSuccess={() => refetch()} trigger={<Button size="sm" variant={onboarding.empresaCriada ? "default" : "secondary"} disabled={!onboarding.empresaCriada}>Cadastrar</Button>} />
+            action: <NovoSetorDialog onSuccess={() => refetch()} trigger={<Button size="sm" variant={onboarding.empresaCriada ? "default" : "secondary"} disabled={!onboarding.empresaCriada}>Cadastrar Setor</Button>} />
         },
         {
             id: 'funcionario',
-            title: 'Primeiro Funcionário',
-            description: 'Adicione colaboradores ao sistema.',
+            title: 'Equipes e Colaboradores',
+            description: 'Adicione ao menos um funcionário para começar o monitoramento.',
             completed: onboarding.funcionarioCadastrado,
             icon: Users,
             disabled: !onboarding.setorCadastrado,
-            action: <NovoFuncionarioDialog onSuccess={() => refetch()} trigger={<Button size="sm" variant={onboarding.setorCadastrado ? "default" : "secondary"} disabled={!onboarding.setorCadastrado}>Adicionar</Button>} />
-        },
-        {
-            id: 'vinculo',
-            title: 'Vínculo Estrutural',
-            description: 'Relacione funcionários aos setores.',
-            completed: onboarding.vinculoSetorEfetivado,
-            icon: ArrowRight,
-            disabled: !onboarding.funcionarioCadastrado,
-            action: <Button size="sm" variant={onboarding.funcionarioCadastrado ? "default" : "secondary"} disabled={!onboarding.funcionarioCadastrado} onClick={() => { /* Simula vinculo ou abre lista */ }}>Vincular</Button>
-        },
-        {
-            id: 'treinamentos',
-            title: 'Planejar Treinamentos',
-            description: 'Defina as NRs iniciais dos colaboradores.',
-            completed: onboarding.treinamentosPlanejados,
-            icon: GraduationCap,
-            disabled: !onboarding.vinculoSetorEfetivado,
-            action: <Button size="sm" variant="outline" disabled={!onboarding.vinculoSetorEfetivado}>Agendar</Button>
-        },
-        {
-            id: 'inventario',
-            title: 'Inventário de Riscos',
-            description: 'Gere o primeiro rascunho do seu PGR.',
-            completed: onboarding.inventarioGerado,
-            icon: FileSearch,
-            disabled: !onboarding.vinculoSetorEfetivado,
-            action: <Button size="sm" variant="outline" disabled={!onboarding.vinculoSetorEfetivado}>Gerar</Button>
+            action: <NovoFuncionarioDialog onSuccess={() => refetch()} trigger={<Button size="sm" variant={onboarding.setorCadastrado ? "default" : "secondary"} disabled={!onboarding.setorCadastrado}>Adicionar Funcionário</Button>} />
         }
     ];
 
     const completedCount = Object.values(onboarding).filter(v => v === true && typeof v === 'boolean').length;
     // Se completouOnboarding estiver incluso na contagem, subtraímos
     const finalCount = onboarding.completouOnboarding ? completedCount - 1 : completedCount;
-    const progress = (finalCount / 6) * 100;
+    const progress = (finalCount / 3) * 100;
 
-    if (onboarding.completouOnboarding && !isOpen) return null;
+    if (onboarding.completouOnboarding && !isOnboardingOpen) return null;
 
     return (
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <Sheet open={isOnboardingOpen} onOpenChange={setIsOnboardingOpen}>
             <SheetContent side="right" className="sm:max-w-md border-l-primary-100">
                 <SheetHeader className="pb-6 border-b">
                     <div className="flex items-center gap-2 mb-2">
@@ -108,9 +83,9 @@ export function OnboardingDrawer() {
                         </div>
                         <span className="text-xs font-bold text-primary-600 uppercase tracking-wider">Passo a Passo</span>
                     </div>
-                    <SheetTitle className="text-2xl font-bold text-neutral-900">Configuração Inicial</SheetTitle>
+                    <SheetTitle className="text-2xl font-bold text-neutral-900">Estrutura Mínima</SheetTitle>
                     <SheetDescription className="text-neutral-500">
-                        Complete estas etapas para deixar seu ambiente NR-1 Pro pronto para uso.
+                        Complete esta base estrutural para que possamos iniciar a jornada de conformidade NR-1.
                     </SheetDescription>
                 </SheetHeader>
 
@@ -131,12 +106,12 @@ export function OnboardingDrawer() {
                                 <div className="w-16 h-16 bg-success-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-success-200">
                                     <Sparkles className="w-8 h-8 text-white" />
                                 </div>
-                                <h3 className="text-xl font-bold text-success-900 mb-2">Estrutura Pronta!</h3>
+                                <h3 className="text-xl font-bold text-success-900 mb-2">Base Preparada!</h3>
                                 <p className="text-sm text-success-700 leading-relaxed mb-6">
-                                    Sua empresa já possui setores e funcionários vinculados conforme a NR-1. Você está pronto para os próximos passos.
+                                    Agora que a estrutura mínima foi criada, vamos iniciar o mapeamento de riscos e exames para atingir a conformidade.
                                 </p>
-                                <Button className="w-full bg-success-600 hover:bg-success-700" onClick={() => setIsOpen(false)}>
-                                    Ir para o Dashboard
+                                <Button className="w-full bg-success-600 hover:bg-success-700" onClick={() => setIsOnboardingOpen(false)}>
+                                    Continuar Jornada
                                 </Button>
                             </div>
                         ) : (
@@ -179,9 +154,10 @@ export function OnboardingDrawer() {
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent">
-                    <div className="p-4 bg-primary-50 rounded-xl border border-primary-100">
-                        <p className="text-xs text-primary-700 leading-relaxed">
-                            <strong>Dica:</strong> Uma estrutura bem definida facilitará a geração automática do seu inventário de riscos.
+                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                        <p className="text-xs text-amber-700 leading-relaxed">
+                            <strong>Nota:</strong> Esta etapa é apenas para configurar a estrutura. A conformidade regulatória exige mapeamento de riscos e documentação completa.
                         </p>
                     </div>
                 </div>

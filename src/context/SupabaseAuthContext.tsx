@@ -57,6 +57,7 @@ interface AuthContextType {
   // Empresa
   selecionarEmpresa: (empresaId: string) => void;
   criarEmpresa: (dados: { nome: string; cnpj?: string }) => Promise<EmpresaVinculada | null>;
+  atualizarEmpresa: (empresaId: string, dados: { nome: string; cnpj?: string }) => Promise<boolean>;
 
   // Permissões
   hasPermission: (permission: string) => boolean;
@@ -519,6 +520,35 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, [user, carregarDadosUsuario]);
 
+  const atualizarEmpresa = useCallback(async (empresaId: string, dados: { nome: string; cnpj?: string }): Promise<boolean> => {
+    if (!user) return false;
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          nome_fantasia: dados.nome,
+          cnpj: dados.cnpj || null
+        } as never)
+        .eq('id', empresaId);
+
+      if (error) throw error;
+
+      // Recarregar dados para refletir mudanças na UI
+      await carregarDadosUsuario(user.id, user);
+
+      toast.success('Dados da empresa atualizados!');
+      return true;
+    } catch (error: any) {
+      console.error('[Auth] Erro ao atualizar empresa:', error);
+      toast.error('Erro ao atualizar empresa: ' + (error.message || 'Erro desconhecido'));
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, carregarDadosUsuario]);
+
   // =============================================================================
   // PERMISSÕES
   // =============================================================================
@@ -579,6 +609,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     updateAvatar,
     selecionarEmpresa,
     criarEmpresa,
+    atualizarEmpresa,
     hasPermission,
     hasRole,
     isAdmin,

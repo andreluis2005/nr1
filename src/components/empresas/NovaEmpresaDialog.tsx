@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Plus } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 
@@ -20,21 +20,35 @@ interface NovaEmpresaDialogProps {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
     onSuccess?: () => void;
+    mode?: 'create' | 'verify';
 }
 
-export function NovaEmpresaDialog({ trigger, onSuccess, open: constrainedOpen, onOpenChange: constrainedOnOpenChange }: NovaEmpresaDialogProps) {
-    const { criarEmpresa } = useSupabaseAuth();
+export function NovaEmpresaDialog({
+    trigger,
+    onSuccess,
+    open: constrainedOpen,
+    onOpenChange: constrainedOnOpenChange,
+    mode = 'create'
+}: NovaEmpresaDialogProps) {
+    const { criarEmpresa, atualizarEmpresa, empresaSelecionada } = useSupabaseAuth();
     const [internalOpen, setInternalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const [nomeEmpresa, setNomeEmpresa] = useState('');
     const [cnpjEmpresa, setCnpjEmpresa] = useState('');
 
-    // Controlar open state (controlado ou descontrolado)
+    // Preencher dados se estiver em modo de verificação
+    useEffect(() => {
+        if (mode === 'verify' && empresaSelecionada?.empresa) {
+            setNomeEmpresa(empresaSelecionada.empresa.nome_fantasia || '');
+            setCnpjEmpresa(empresaSelecionada.empresa.cnpj || '');
+        }
+    }, [mode, empresaSelecionada, internalOpen, constrainedOpen]);
+
     const open = constrainedOpen !== undefined ? constrainedOpen : internalOpen;
     const setOpen = constrainedOnOpenChange || setInternalOpen;
 
-    const handleCriarEmpresa = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!nomeEmpresa.trim()) {
             toast.error("Nome da empresa é obrigatório");
@@ -44,12 +58,23 @@ export function NovaEmpresaDialog({ trigger, onSuccess, open: constrainedOpen, o
         setIsLoading(true);
 
         try {
-            const novaEmpresa = await criarEmpresa({ nome: nomeEmpresa, cnpj: cnpjEmpresa });
-            if (novaEmpresa) {
-                setOpen(false);
-                setNomeEmpresa('');
-                setCnpjEmpresa('');
-                if (onSuccess) onSuccess();
+            if (mode === 'verify' && empresaSelecionada?.empresa_id) {
+                const ok = await atualizarEmpresa(empresaSelecionada.empresa_id, {
+                    nome: nomeEmpresa,
+                    cnpj: cnpjEmpresa
+                });
+                if (ok) {
+                    setOpen(false);
+                    if (onSuccess) onSuccess();
+                }
+            } else {
+                const novaEmpresa = await criarEmpresa({ nome: nomeEmpresa, cnpj: cnpjEmpresa });
+                if (novaEmpresa || novaEmpresa === null) { // criarEmpresa retorna null mas atualiza o context
+                    setOpen(false);
+                    setNomeEmpresa('');
+                    setCnpjEmpresa('');
+                    if (onSuccess) onSuccess();
+                }
             }
         } catch (error) {
             console.error(error);
@@ -58,19 +83,24 @@ export function NovaEmpresaDialog({ trigger, onSuccess, open: constrainedOpen, o
         }
     };
 
+    const isVerify = mode === 'verify';
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
             <DialogContent className="sm:max-w-[425px]">
-                <form onSubmit={handleCriarEmpresa}>
+                <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Building2 className="w-5 h-5 text-primary-600" />
-                            Criar sua Empresa
+                            {isVerify ? "Verificar Cadastro" : "Criar sua Empresa"}
                         </DialogTitle>
                         <DialogDescription>
-                            Vamos começar! Crie o perfil da sua empresa para gerenciar a segurança do trabalho.
+                            {isVerify
+                                ? "Confirme ou atualize os dados básicos da sua empresa."
+                                : "Vamos começar! Crie o perfil da sua empresa para gerenciar a segurança do trabalho."
+                            }
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -101,7 +131,7 @@ export function NovaEmpresaDialog({ trigger, onSuccess, open: constrainedOpen, o
                             Cancelar
                         </Button>
                         <Button type="submit" className="bg-primary-600 hover:bg-primary-700" disabled={isLoading}>
-                            {isLoading ? "Criando..." : "Criar Empresa"}
+                            {isLoading ? "Salvando..." : (isVerify ? "Confirmar Dados" : "Criar Empresa")}
                         </Button>
                     </DialogFooter>
                 </form>

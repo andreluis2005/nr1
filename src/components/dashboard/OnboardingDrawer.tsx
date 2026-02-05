@@ -19,10 +19,12 @@ import {
 import { useData } from "@/context/DataContext";
 import { NovoSetorDialog } from "@/components/setores/NovoSetorDialog";
 import { NovoFuncionarioDialog } from "@/components/funcionarios/NovoFuncionarioDialog";
+import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { NovaEmpresaDialog } from "@/components/empresas/NovaEmpresaDialog";
 
 export function OnboardingDrawer() {
     const { onboarding, refetch, isLoading, isOnboardingOpen, setIsOnboardingOpen } = useData();
+    const { empresaSelecionada } = useSupabaseAuth();
 
     // Abrir automaticamente se o onboarding não estiver completo
     useEffect(() => {
@@ -31,6 +33,8 @@ export function OnboardingDrawer() {
             return () => clearTimeout(timer);
         }
     }, [onboarding.completouOnboarding, isLoading, setIsOnboardingOpen]);
+
+    const hasCompanyContext = !!empresaSelecionada;
 
     const steps = [
         {
@@ -41,8 +45,8 @@ export function OnboardingDrawer() {
             icon: Building2,
             action: (
                 <NovaEmpresaDialog
-                    mode={onboarding.empresaCriada ? 'verify' : 'create'}
-                    trigger={<Button size="sm" variant="outline">{onboarding.empresaCriada ? 'Verificar' : 'Começar'}</Button>}
+                    mode={hasCompanyContext ? 'verify' : 'create'}
+                    trigger={<Button size="sm" variant="outline">{hasCompanyContext ? 'Verificar' : 'Começar'}</Button>}
                 />
             )
         },

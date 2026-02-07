@@ -38,6 +38,7 @@ interface UseDashboardMetricsResult {
     riscos: Risco[];
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
+    exposureData: any;
     isLoading: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
@@ -55,6 +56,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
     const [riscos, setRiscos] = useState<Risco[]>([]);
     const [onboarding, setOnboarding] = useState<OnboardingStatus>(defaultOnboarding);
     const [regulatoryState, setRegulatoryState] = useState<RegulatoryEngineResult | null>(null);
+    const [exposureData, setExposureData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -206,6 +208,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             });
 
             const technicalResult = await runTechnicalAgent(riscosFormatados, workersPerSector, workersPerRole);
+            setExposureData(technicalResult);
             const totalAlertasCriticos = alertasCriticos + technicalResult.riscosCriticosCount;
 
             // -----------------------------------------------------------------
@@ -284,6 +287,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         riscos,
         onboarding,
         regulatoryState,
+        exposureData,
         isLoading,
         error,
         refetch: fetchMetrics

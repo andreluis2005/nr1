@@ -58,6 +58,16 @@ export interface Risco {
     status: string;
 }
 
+export interface TechnicalExposureResult {
+    totalRiscos: number;
+    riscosCriticosCount: number;
+    exposicaoTotal: number;
+    exposicaoPorSetor: Record<string, number>;
+    exposicaoPorFuncao: Record<string, number>;
+    isCritico: boolean;
+    inventory: any[];
+}
+
 export interface Metrics {
     totalFuncionarios: number;
     funcionariosAtivos: number;
@@ -85,6 +95,7 @@ interface DataContextType {
     riscos: Risco[];
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
+    exposureData: TechnicalExposureResult | null;
     isLoading: boolean;
     refetch: () => Promise<void>;
     isOnboardingOpen: boolean;
@@ -106,6 +117,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         riscos,
         onboarding,
         regulatoryState,
+        exposureData,
         isLoading,
         refetch
     } = useDashboardMetrics();
@@ -121,6 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             riscos,
             onboarding,
             regulatoryState,
+            exposureData,
             isLoading,
             refetch,
             isOnboardingOpen,

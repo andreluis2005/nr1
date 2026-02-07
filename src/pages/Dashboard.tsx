@@ -8,7 +8,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
-import { useState } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { OnboardingDrawer } from "@/components/dashboard/OnboardingDrawer";
 import { StatusJornada } from "@/components/dashboard/StatusJornada";
@@ -103,6 +102,7 @@ export function Dashboard() {
     metrics,
     alertas,
     exames,
+    regulatoryState,
     isLoading
   } = useData();
 
@@ -128,14 +128,8 @@ export function Dashboard() {
     return e.status === 'realizado' && vencimento <= trintaDias && vencimento >= hoje;
   }).slice(0, 5);
 
-  const getCorConformidade = (indice: number) => {
-    if (indice >= 90) return 'green' as const;
-    if (indice >= 70) return 'amber' as const;
-    return 'red' as const;
-  };
-
   const dadosGrafico = [
-    { mes: 'Jan', valor: metrics.indiceConformidade, meta: 95 }
+    { mes: 'Jan', valor: regulatoryState?.progress || 0, meta: 95 }
   ];
 
   return (
@@ -170,12 +164,12 @@ export function Dashboard() {
         />
         <MetricCard
           title="Índice de Conformidade"
-          value={`${metrics.indiceConformidade}%`}
-          subtitle="Meta: 95%"
-          trend={metrics.indiceConformidade >= 90 ? 'up' : 'down'}
-          trendValue="+5%"
+          value={`${regulatoryState?.progress || 0}%`}
+          subtitle={`Status: ${regulatoryState?.label || '...'}`}
+          trend={(regulatoryState?.progress || 0) >= 90 ? 'up' : 'down'}
+          trendValue=""
           icon={ShieldCheck}
-          color={getCorConformidade(metrics.indiceConformidade)}
+          color={(regulatoryState?.color as any) || 'amber'}
           onClick={() => window.location.hash = '#/app/pgr'}
         />
         <MetricCard
@@ -235,13 +229,13 @@ export function Dashboard() {
             title="Status do PGR"
             subtitle="Programa de Gerenciamento de Riscos"
             icon={FileText}
-            color="bg-accent-purple/10 text-accent-purple"
+            color={`bg-${regulatoryState?.color}-500/10 text-${regulatoryState?.color}-600`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${metrics.pgrStatus === 'atualizado' ? 'bg-success-500' : 'bg-warning-500'}`} />
+                <div className={`w-2 h-2 rounded-full bg-${regulatoryState?.color}-500`} />
                 <span className="text-sm font-medium text-neutral-700">
-                  {metrics.pgrStatus === 'atualizado' ? 'Atualizado' : 'Revisão Pendente'}
+                  {regulatoryState?.label || 'Carregando...'}
                 </span>
               </div>
             </div>

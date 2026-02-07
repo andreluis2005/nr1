@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { 
-  BarChart3, 
-  Download, 
-  FileText, 
+import {
+  BarChart3,
+  Download,
+  FileText,
   Calendar,
   FileSpreadsheet,
   TrendingUp,
@@ -10,48 +10,74 @@ import {
   CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
-import { useApp } from '@/context/AppContext';
+import { useData } from '@/context/DataContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+// Mocks locais para relatórios gerados (não fazem parte do motor regulatório)
+const relatoriosGeradosMock = [
+  {
+    id: '1',
+    tipo: 'compliance',
+    titulo: 'Status_Compliance_Janeiro_2026',
+    dataGeracao: '2026-01-30',
+    periodoInicio: '2026-01-01',
+    periodoFim: '2026-01-30',
+    formato: 'pdf',
+    url: '/relatorios/compliance_jan2026.pdf',
+    tamanho: 2457600
+  },
+  {
+    id: '2',
+    tipo: 'pgr',
+    titulo: 'PGR_Completo_2026',
+    dataGeracao: '2026-01-15',
+    periodoInicio: '2026-01-01',
+    periodoFim: '2026-01-15',
+    formato: 'pdf',
+    url: '/relatorios/pgr_2026.pdf',
+    tamanho: 4194304
+  }
+];
+
 const tiposRelatorio = [
-  { 
-    id: 'compliance', 
-    label: 'Status de Compliance', 
+  {
+    id: 'compliance',
+    label: 'Status de Compliance',
     icon: CheckCircle2,
     desc: 'Visão geral do índice de conformidade da empresa',
     formatos: ['pdf', 'xlsx']
   },
-  { 
-    id: 'pgr', 
-    label: 'PGR Completo', 
+  {
+    id: 'pgr',
+    label: 'PGR Completo',
     icon: FileText,
     desc: 'Programa de Gerenciamento de Riscos documentado',
     formatos: ['pdf']
   },
-  { 
-    id: 'exames', 
-    label: 'Exames Ocupacionais', 
+  {
+    id: 'exames',
+    label: 'Exames Ocupacionais',
     icon: Calendar,
     desc: 'Relatório de controle de exames e vencimentos',
     formatos: ['pdf', 'xlsx']
   },
-  { 
-    id: 'treinamentos', 
-    label: 'Treinamentos', 
+  {
+    id: 'treinamentos',
+    label: 'Treinamentos',
     icon: TrendingUp,
     desc: 'Controle de capacitações e certificações',
     formatos: ['pdf', 'xlsx']
   },
-  { 
-    id: 'alertas', 
-    label: 'Alertas Pendentes', 
+  {
+    id: 'alertas',
+    label: 'Alertas Pendentes',
     icon: AlertTriangle,
     desc: 'Lista de alertas e não conformidades',
     formatos: ['pdf', 'xlsx']
   },
-  { 
-    id: 'funcionarios', 
-    label: 'Funcionários', 
+  {
+    id: 'funcionarios',
+    label: 'Funcionários',
     icon: Users,
     desc: 'Cadastro e situação dos colaboradores',
     formatos: ['pdf', 'xlsx']
@@ -59,7 +85,8 @@ const tiposRelatorio = [
 ];
 
 export function Relatorios() {
-  const { relatorios, metrics } = useApp();
+  const { metrics, regulatoryState } = useData();
+  const relatorios = relatoriosGeradosMock;
   const [showGerarRelatorio, setShowGerarRelatorio] = useState(false);
   const [tipoSelecionado, setTipoSelecionado] = useState<string | null>(null);
   const [periodoInicio, setPeriodoInicio] = useState('');
@@ -95,14 +122,14 @@ export function Relatorios() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
+        <div className={`bg-gradient-to-br from-${regulatoryState?.color === 'green' ? 'success' : (regulatoryState?.color === 'red' ? 'danger' : 'blue')}-500 to-${regulatoryState?.color === 'green' ? 'success' : (regulatoryState?.color === 'red' ? 'danger' : 'blue')}-600 rounded-xl p-5 text-white`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{metrics.indiceConformidade}%</p>
-              <p className="text-sm text-blue-100">Índice de Conformidade</p>
+              <p className="text-2xl font-bold">{regulatoryState?.progress || 0}%</p>
+              <p className="text-sm text-blue-100 italic">{regulatoryState?.label || 'Conformidade'}</p>
             </div>
           </div>
         </div>
@@ -137,7 +164,7 @@ export function Relatorios() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tiposRelatorio.map((tipo) => (
-            <div 
+            <div
               key={tipo.id}
               className="bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
               onClick={() => handleGerarRelatorio(tipo.id)}
@@ -148,8 +175,8 @@ export function Relatorios() {
                 </div>
                 <div className="flex gap-1">
                   {tipo.formatos.map(fmt => (
-                    <span 
-                      key={fmt} 
+                    <span
+                      key={fmt}
                       className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded uppercase"
                     >
                       {fmt}
@@ -254,7 +281,7 @@ export function Relatorios() {
           {tipoSelecionado && (() => {
             const tipo = tiposRelatorio.find(t => t.id === tipoSelecionado);
             if (!tipo) return null;
-            
+
             return (
               <div className="space-y-4 mt-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
@@ -266,14 +293,14 @@ export function Relatorios() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Período Início
                     </label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={periodoInicio}
                       onChange={(e) => setPeriodoInicio(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -283,15 +310,15 @@ export function Relatorios() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Período Fim
                     </label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={periodoFim}
                       onChange={(e) => setPeriodoFim(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     />
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Formato
@@ -301,11 +328,10 @@ export function Relatorios() {
                       <button
                         key={fmt}
                         onClick={() => setFormato(fmt)}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                          formato === fmt 
-                            ? 'bg-blue-600 border-blue-600 text-white' 
-                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }`}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors ${formato === fmt
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
                       >
                         {fmt === 'pdf' ? (
                           <FileText className="w-4 h-4" />
@@ -317,15 +343,15 @@ export function Relatorios() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end gap-3 pt-4">
-                  <button 
+                  <button
                     onClick={() => setShowGerarRelatorio(false)}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     Cancelar
                   </button>
-                  <button 
+                  <button
                     onClick={() => setShowGerarRelatorio(false)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
                   >

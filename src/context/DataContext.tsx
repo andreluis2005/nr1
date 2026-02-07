@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import type { RegulatoryEngineResult } from "@/domains/risks/nr1.engine";
 
 // --- Interfaces para Compatibilidade com a UI ---
 export interface Alerta {
@@ -60,13 +61,11 @@ export interface Risco {
 export interface Metrics {
     totalFuncionarios: number;
     funcionariosAtivos: number;
-    indiceConformidade: number;
     alertasPendentes: number;
     alertasCriticos: number;
     examesVencidos: number;
     examesAVencer: number;
     treinamentosVencidos: number;
-    pgrStatus: 'atualizado' | 'atencao' | 'vencido';
 }
 
 export interface OnboardingStatus {
@@ -85,6 +84,7 @@ interface DataContextType {
     setores: Setor[];
     riscos: Risco[];
     onboarding: OnboardingStatus;
+    regulatoryState: RegulatoryEngineResult | null;
     isLoading: boolean;
     refetch: () => Promise<void>;
     isOnboardingOpen: boolean;
@@ -105,6 +105,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setores,
         riscos,
         onboarding,
+        regulatoryState,
         isLoading,
         refetch
     } = useDashboardMetrics();
@@ -119,6 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             setores,
             riscos,
             onboarding,
+            regulatoryState,
             isLoading,
             refetch,
             isOnboardingOpen,

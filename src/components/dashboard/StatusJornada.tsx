@@ -9,8 +9,11 @@ import { Button } from '@/components/ui/button';
 import { useData } from '@/context/DataContext';
 
 export function StatusJornada() {
-    const { onboarding, metrics, riscos, setIsOnboardingOpen } = useData();
+    const { onboarding, metrics, riscos, regulatoryState, setIsOnboardingOpen } = useData();
     const risksMapped = (riscos || []).length > 0;
+
+    // Se o motor ainda não carregou, mostramos um estado inicial ou nada
+    if (!regulatoryState) return null;
 
     const journeySteps = [
         {
@@ -24,20 +27,22 @@ export function StatusJornada() {
         {
             id: 'riscos',
             label: 'Mapeamento de Riscos',
-            status: onboarding.completouOnboarding
-                ? (metrics.indiceConformidade > 0 && risksMapped ? 'done' : 'doing')
-                : 'locked',
+            status: regulatoryState.state === 'MAPEAMENTO_PENDENTE' || regulatoryState.state === 'ESTRUTURA_OK'
+                ? 'doing'
+                : (regulatoryState.progress > 40 ? 'done' : 'locked'),
             icon: ShieldAlert,
             description: risksMapped ? 'Identificação de perigos realizada.' : 'Identifique perigos e riscos por ambiente.',
-            action: onboarding.completouOnboarding ? 'Mapear Riscos' : null
+            action: regulatoryState.state === 'ESTRUTURA_OK' || regulatoryState.state === 'MAPEAMENTO_PENDENTE' ? 'Mapear Riscos' : null
         },
         {
             id: 'gro',
             label: 'Inventário GRO / PGR',
-            status: metrics.pgrStatus === 'atualizado' ? 'done' : 'locked',
+            status: regulatoryState.state === 'INVENTARIO_PENDENTE'
+                ? 'doing'
+                : (regulatoryState.progress >= 80 ? 'done' : 'locked'),
             icon: FileCheck,
             description: 'Gere os documentos obrigatórios da NR-1.',
-            action: metrics.pgrStatus === 'atualizado' ? 'Gerar PDF' : null
+            action: regulatoryState.state === 'INVENTARIO_PENDENTE' ? 'Gerar PDF' : (regulatoryState.progress >= 80 ? 'Ver PDF' : null)
         }
     ];
 
@@ -49,20 +54,33 @@ export function StatusJornada() {
                         <ShieldAlert className="w-4 h-4 text-primary-600" />
                         Copiloto da Jornada NR-1
                     </h3>
-                    <p className="text-xs text-neutral-500">Acompanhe sua evolução regulatória em tempo real.</p>
+                    <p className="text-xs text-neutral-500">{regulatoryState.description}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Maturidade</span>
-                    <div className="flex gap-1">
-                        {[1, 2, 3].map((i) => (
-                            <div
-                                key={i}
-                                className={`w-3 h-1.5 rounded-full ${i === 1 && onboarding.completouOnboarding ? 'bg-success-500' :
-                                    i === 2 && metrics.pgrStatus === 'atualizado' ? 'bg-success-500' :
-                                        'bg-neutral-200'
-                                    }`}
-                            />
-                        ))}
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Agentes</span>
+                        <div className="flex gap-1">
+                            <AgentDot label="L" active={regulatoryState.agents.legal} />
+                            <AgentDot label="F" active={regulatoryState.agents.fiscal} />
+                            <AgentDot label="T" active={regulatoryState.agents.tecnico} />
+                            <AgentDot label="E" active={regulatoryState.agents.evidencia} />
+                        </div>
+                    </div>
+                    <div className="h-4 w-px bg-neutral-200" />
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Maturidade</span>
+                        <div className="flex gap-1">
+                            {[1, 2, 3].map((i) => (
+                                <div
+                                    key={i}
+                                    className={`w-3 h-1.5 rounded-full ${i === 1 && onboarding.completouOnboarding ? 'bg-success-500' :
+                                            i === 2 && regulatoryState.progress >= 60 ? 'bg-success-500' :
+                                                i === 3 && regulatoryState.progress === 100 ? 'bg-success-500' :
+                                                    'bg-neutral-200'
+                                        }`}
+                                />
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -132,9 +150,9 @@ export function StatusJornada() {
             <div className="px-6 py-3 bg-neutral-50/50 border-t border-neutral-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="w-5 h-5 rounded-full border-2 border-white bg-neutral-200 flex items-center justify-center overflow-hidden">
-                                <ShieldAlert className="w-2.5 h-2.5 text-neutral-400" />
+                        {['L', 'F', 'T', 'E'].map(agent => (
+                            <div key={agent} className="w-5 h-5 rounded-full border-2 border-white bg-neutral-200 flex items-center justify-center overflow-hidden">
+                                <span className="text-[8px] font-bold text-neutral-400">{agent}</span>
                             </div>
                         ))}
                     </div>
@@ -142,12 +160,25 @@ export function StatusJornada() {
                         "O GRO deve ser mantido de forma contínua conforme NR-1.02"
                     </span>
                 </div>
-                {!onboarding.completouOnboarding && (
+                {regulatoryState.state !== 'CONFORME_OURO' && (
                     <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
-                        PENDENTE: CADASTRO BASE
+                        {regulatoryState.label.toUpperCase()}: {regulatoryState.nextStep.toUpperCase()}
                     </span>
                 )}
             </div>
         </div>
     );
 }
+
+function AgentDot({ label, active }: { label: string; active: boolean }) {
+    return (
+        <div
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold transition-all ${active ? 'bg-success-500 text-white shadow-sm' : 'bg-neutral-200 text-neutral-400'
+                }`}
+            title={active ? `Agente ${label} Validado` : `Agente ${label} Aguardando`}
+        >
+            {label}
+        </div>
+    );
+}
+

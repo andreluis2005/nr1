@@ -30,6 +30,7 @@ interface EmpresaVinculada {
     plano: string;
     status: string;
     empresa_pai_id?: string | null;
+    b_verificada: boolean;
   };
 }
 
@@ -57,7 +58,7 @@ interface AuthContextType {
   // Empresa
   selecionarEmpresa: (empresaId: string) => void;
   criarEmpresa: (dados: { nome: string; cnpj?: string }) => Promise<EmpresaVinculada | null>;
-  atualizarEmpresa: (empresaId: string, dados: { nome: string; cnpj?: string }) => Promise<boolean>;
+  atualizarEmpresa: (empresaId: string, dados: { nome?: string; cnpj?: string; b_verificada?: boolean }) => Promise<boolean>;
 
   // Permissões
   hasPermission: (permission: string) => boolean;
@@ -217,7 +218,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
               cnpj,
               logo_url,
               plano,
-              status
+              status,
+              b_verificada
             )
           `)
           .eq('usuario_id', userId);
@@ -241,11 +243,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
             console.log('[Auth] ONBOARDING: Usuário sem empresa detectado. Criando para:', metaEmpresaNome);
             toast.info('Configurando sua empresa: ' + metaEmpresaNome);
             try {
-              const { data: novaEmpresaId, error: rpcError } = await (supabase as any)
+              const { data: empresaData, error: rpcError } = await (supabase as any)
                 .rpc('criar_empresa_rpc', {
                   p_nome_fantasia: metaEmpresaNome,
                   p_cnpj: metaEmpresaCnpj || null
                 });
+
+              const novaEmpresaId = empresaData?.id;
 
               if (rpcError) {
                 console.error('[Auth] Erro no RPC criar_empresa_rpc:', rpcError);
@@ -264,7 +268,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
               await new Promise(resolve => setTimeout(resolve, 500));
 
               // Recarregar empresas após criação
-              await carregarDadosUsuario(userId, userForMetadata);
+              await carregarDadosUsuario(userId, userForMetadata || undefined);
               return;
             } catch (rpcErr) {
               console.error('[Auth] Falha crítica no onboarding:', rpcErr);
@@ -485,14 +489,22 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     setIsLoading(true);
 
     try {
-      // Usar RPC segura para contornar RLS de insert
-      const { error: rpcError } = await (supabase as any)
+      // Usar RPC segura
+      const { data: empresaData, error: rpcError } = await (supabase as any)
         .rpc('criar_empresa_rpc', {
           p_nome_fantasia: dados.nome,
           p_cnpj: dados.cnpj || null
         });
 
       if (rpcError) throw rpcError;
+
+      // Marcar como verificada por padrão ao criar
+      if (empresaData?.id) {
+        await supabase
+          .from('empresas')
+          .update({ b_verificada: true } as never)
+          .eq('id', empresaData.id);
+      }
 
       // Recarregar dados completos do usuário para atualizar lista de empresas
       await carregarDadosUsuario(user.id, user);
@@ -520,17 +532,22 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, [user, carregarDadosUsuario]);
 
-  const atualizarEmpresa = useCallback(async (empresaId: string, dados: { nome: string; cnpj?: string }): Promise<boolean> => {
+  const atualizarEmpresa = useCallback(async (empresaId: string, dados: { nome?: string; cnpj?: string; b_verificada?: boolean }): Promise<boolean> => {
     if (!user) return false;
     setIsLoading(true);
 
     try {
+      const updates: any = {};
+      if (dados.nome) updates.nome_fantasia = dados.nome;
+      if (dados.cnpj !== undefined) updates.cnpj = dados.cnpj || null;
+
+      if (dados.b_verificada !== undefined) {
+        updates.b_verificada = dados.b_verificada;
+      }
+
       const { error } = await supabase
         .from('empresas')
-        .update({
-          nome_fantasia: dados.nome,
-          cnpj: dados.cnpj || null
-        } as never)
+        .update(updates as never)
         .eq('id', empresaId);
 
       if (error) throw error;

@@ -1,11 +1,11 @@
-import type { 
-  Empresa, 
-  Funcionario, 
-  Exame, 
-  Treinamento, 
-  Risco, 
-  PGR, 
-  Alerta, 
+import type {
+  Empresa,
+  Funcionario,
+  Exame,
+  Treinamento,
+  Risco,
+  PGR,
+  Alerta,
   DashboardMetrics,
   Relatorio,
   Setor,
@@ -678,13 +678,11 @@ export const usuariosMock: Usuario[] = [
 export const dashboardMetricsMock: DashboardMetrics = {
   totalFuncionarios: 127,
   funcionariosAtivos: 118,
-  indiceConformidade: 87,
   alertasPendentes: 8,
   alertasCriticos: 2,
   examesVencidos: 1,
   examesAVencer: 8,
-  treinamentosVencidos: 2,
-  pgrStatus: 'atencao'
+  treinamentosVencidos: 2
 };
 
 // CNAEs e Riscos por CNAE
@@ -720,33 +718,25 @@ export function calcularMetricas(
 ): DashboardMetrics {
   const hoje = new Date();
   const trintaDias = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000);
-  
+
   const examesVencidos = exames.filter(e => e.status === 'vencido').length;
   const examesAVencer = exames.filter(e => {
     const vencimento = new Date(e.dataVencimento);
     return e.status === 'realizado' && vencimento <= trintaDias && vencimento >= hoje;
   }).length;
-  
+
   const treinamentosVencidos = treinamentos.filter(t => t.status === 'vencido').length;
-  
+
   const alertasCriticos = alertas.filter(a => a.prioridade === 'critica' && a.status !== 'resolvido').length;
   const alertasPendentes = alertas.filter(a => a.status !== 'resolvido').length;
-  
-  // Cálculo simplificado do índice de conformidade
-  const totalItens = exames.length + treinamentos.length;
-  const itensEmDia = exames.filter(e => e.status === 'realizado').length + 
-                     treinamentos.filter(t => t.status === 'vigente').length;
-  const indiceConformidade = totalItens > 0 ? Math.round((itensEmDia / totalItens) * 100) : 100;
-  
+
   return {
     totalFuncionarios: funcionarios.length,
     funcionariosAtivos: funcionarios.filter(f => f.status === 'ativo').length,
-    indiceConformidade,
     alertasPendentes,
     alertasCriticos,
     examesVencidos,
     examesAVencer,
-    treinamentosVencidos,
-    pgrStatus: alertasCriticos > 0 ? 'atencao' : 'atualizado'
+    treinamentosVencidos
   };
 }

@@ -23,7 +23,7 @@ import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { NovaEmpresaDialog } from "@/components/empresas/NovaEmpresaDialog";
 
 export function OnboardingDrawer() {
-    const { onboarding, refetch, isLoading, isOnboardingOpen, setIsOnboardingOpen } = useData();
+    const { onboarding, regulatoryState, refetch, isLoading, isOnboardingOpen, setIsOnboardingOpen } = useData();
     const { empresaSelecionada } = useSupabaseAuth();
 
     // Abrir automaticamente se o onboarding não estiver completo
@@ -33,6 +33,8 @@ export function OnboardingDrawer() {
             return () => clearTimeout(timer);
         }
     }, [onboarding.completouOnboarding, isLoading, setIsOnboardingOpen]);
+
+    if (!regulatoryState) return null;
 
     const hasCompanyContext = !!empresaSelecionada;
 
@@ -71,10 +73,10 @@ export function OnboardingDrawer() {
         }
     ];
 
-    const completedCount = Object.values(onboarding).filter(v => v === true && typeof v === 'boolean').length;
-    // Se completouOnboarding estiver incluso na contagem, subtraímos
-    const finalCount = onboarding.completouOnboarding ? completedCount - 1 : completedCount;
-    const progress = (finalCount / 3) * 100;
+    // O progresso aqui é específico desta etapa de onboarding (Estrutura)
+    // Vamos usar a contagem de passos ou o progresso do motor se ele estiver na fase inicial
+    const completedCount = steps.filter(s => s.completed).length;
+    const progress = (completedCount / 3) * 100;
 
     if (onboarding.completouOnboarding && !isOnboardingOpen) return null;
 
@@ -98,7 +100,7 @@ export function OnboardingDrawer() {
                     {/* Barra de Progresso */}
                     <div className="space-y-3">
                         <div className="flex justify-between text-sm">
-                            <span className="font-semibold text-neutral-700">Progresso Geral</span>
+                            <span className="font-semibold text-neutral-700">Progresso da Base</span>
                             <span className="font-bold text-primary-600">{Math.round(progress)}%</span>
                         </div>
                         <Progress value={progress} className="h-2 bg-neutral-100" />
@@ -113,7 +115,9 @@ export function OnboardingDrawer() {
                                 </div>
                                 <h3 className="text-xl font-bold text-success-900 mb-2">Base Preparada!</h3>
                                 <p className="text-sm text-success-700 leading-relaxed mb-6">
-                                    Agora que a estrutura mínima foi criada, vamos iniciar o mapeamento de riscos e exames para atingir a conformidade.
+                                    {regulatoryState.label === 'Estrutura OK'
+                                        ? "Agora que a estrutura mínima foi criada, vamos iniciar o mapeamento de riscos."
+                                        : regulatoryState.description}
                                 </p>
                                 <Button className="w-full bg-success-600 hover:bg-success-700" onClick={() => setIsOnboardingOpen(false)}>
                                     Continuar Jornada
@@ -162,7 +166,8 @@ export function OnboardingDrawer() {
                     <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
                         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
                         <p className="text-xs text-amber-700 leading-relaxed">
-                            <strong>Nota:</strong> Esta etapa é apenas para configurar a estrutura. A conformidade regulatória exige mapeamento de riscos e documentação completa.
+                            <strong>Estado Atual:</strong> {regulatoryState.label}<br />
+                            {regulatoryState.nextStep}
                         </p>
                     </div>
                 </div>

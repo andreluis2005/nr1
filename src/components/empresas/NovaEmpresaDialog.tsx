@@ -63,19 +63,18 @@ export function NovaEmpresaDialog({
                 const semAlteracao = nomeEmpresa === dadosOriginais.nome_fantasia &&
                     cnpjEmpresa === (dadosOriginais.cnpj || '');
 
-                if (semAlteracao) {
-                    // Se não houve alteração, apenas fecha e avança
-                    toast.info("Dados confirmados");
-                    setOpen(false);
-                    if (onSuccess) onSuccess();
-                    return;
+                const payload: { nome?: string; cnpj?: string; b_verificada: boolean } = {
+                    b_verificada: true
+                };
+
+                if (!semAlteracao) {
+                    payload.nome = nomeEmpresa;
+                    payload.cnpj = cnpjEmpresa;
                 }
 
-                const ok = await atualizarEmpresa(empresaSelecionada.empresa_id, {
-                    nome: nomeEmpresa,
-                    cnpj: cnpjEmpresa
-                });
+                const ok = await atualizarEmpresa(empresaSelecionada.empresa_id, payload);
                 if (ok) {
+                    if (semAlteracao) toast.info("Dados confirmados");
                     setOpen(false);
                     if (onSuccess) onSuccess();
                 }

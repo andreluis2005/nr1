@@ -143,13 +143,11 @@ export interface InvestigacaoAcidente {
 export interface DashboardMetrics {
   totalFuncionarios: number;
   funcionariosAtivos: number;
-  indiceConformidade: number;
   alertasPendentes: number;
   alertasCriticos: number;
   examesVencidos: number;
   examesAVencer: number;
   treinamentosVencidos: number;
-  pgrStatus: 'atualizado' | 'atencao' | 'vencido';
 }
 
 export interface Relatorio {

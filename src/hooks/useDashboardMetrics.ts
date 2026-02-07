@@ -6,19 +6,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { evaluateRegulatoryState, type RegulatoryEngineResult } from '@/domains/risks/nr1.engine';
+import { runTechnicalAgent } from '../../core/agents/technicalAgent';
 import type { Metrics, Alerta, Exame, Treinamento, OnboardingStatus, Setor, Risco } from '@/context/DataContext';
 
 // Dados de fallback caso não haja empresa selecionada ou erro
 const fallbackMetrics: Metrics = {
     totalFuncionarios: 0,
     funcionariosAtivos: 0,
-    indiceConformidade: 0,
     alertasPendentes: 0,
     alertasCriticos: 0,
     examesVencidos: 0,
     examesAVencer: 0,
-    treinamentosVencidos: 0,
-    pgrStatus: 'atencao'
+    treinamentosVencidos: 0
 };
 
 const defaultOnboarding: OnboardingStatus = {
@@ -37,6 +37,7 @@ interface UseDashboardMetricsResult {
     setores: Setor[];
     riscos: Risco[];
     onboarding: OnboardingStatus;
+    regulatoryState: RegulatoryEngineResult | null;
     isLoading: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
@@ -53,6 +54,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
     const [setores, setSetores] = useState<Setor[]>([]);
     const [riscos, setRiscos] = useState<Risco[]>([]);
     const [onboarding, setOnboarding] = useState<OnboardingStatus>(defaultOnboarding);
+    const [regulatoryState, setRegulatoryState] = useState<RegulatoryEngineResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -66,17 +68,28 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         setIsLoading(true);
         setError(null);
 
+        // Buscar status de verificação atualizado diretamente do banco
+        let isVerificada = false;
+        try {
+            const { data: vData } = await supabase
+                .from('empresas')
+                .select('b_verificada')
+                .eq('id', empresaId)
+                .single() as any;
+            isVerificada = !!vData?.b_verificada;
+        } catch (e) {
+            console.error('[useDashboardMetrics] Erro ao buscar status de verificação:', e);
+        }
+
         try {
             // Data atual e daqui a 30 dias para cálculos
             const hoje = new Date().toISOString().split('T')[0];
             const trintaDias = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-            // -----------------------------------------------------------------
-            // 1. FUNCIONÁRIOS
-            // -----------------------------------------------------------------
+            // 1. BUSCAR FUNCIONÁRIOS
             const { data: funcionariosData, error: funcError } = await supabase
                 .from('funcionarios')
-                .select('id, nome_completo, status, matricula')
+                .select('id, nome_completo, status, matricula, setor_id, cargo')
                 .eq('empresa_id', empresaId);
 
             if (funcError) throw funcError;
@@ -84,9 +97,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             const totalFuncionarios = (funcionariosData as any[] || []).length;
             const funcionariosAtivos = (funcionariosData as any[] || []).filter(f => f.status === 'ativo').length || 0;
 
-            // -----------------------------------------------------------------
-            // 2. ASOs (Exames Ocupacionais)
-            // -----------------------------------------------------------------
+            // 2. BUSCAR EXAMES (ASOs)
             const { data: asosData, error: asoError } = await supabase
                 .from('asos')
                 .select('id, funcionario_id, tipo_aso, data_validade, status')
@@ -94,19 +105,16 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
             if (asoError) throw asoError;
 
-            // Exames vencidos (data_validade < hoje)
             const examesVencidos = asosData?.filter(a =>
                 a.data_validade && a.data_validade < hoje
             ).length || 0;
 
-            // Exames a vencer nos próximos 30 dias
             const examesAVencer = asosData?.filter(a =>
                 a.data_validade &&
                 a.data_validade >= hoje &&
                 a.data_validade <= trintaDias
             ).length || 0;
 
-            // Converter para formato esperado pela UI
             const examesFormatados: Exame[] = (asosData || []).map(aso => ({
                 id: aso.id,
                 funcionarioId: aso.funcionario_id,
@@ -114,13 +122,11 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 status: aso.data_validade && aso.data_validade < hoje
                     ? 'vencido'
                     : (aso.status === 'aprovado' ? 'realizado' : 'pendente'),
-                dataRealizacao: aso.data_validade || '', // Temporário: usar validade como realização se vácuo
+                dataRealizacao: aso.data_validade || '',
                 dataVencimento: aso.data_validade || ''
             }));
 
-            // -----------------------------------------------------------------
-            // 3. NOTIFICAÇÕES (como Alertas)
-            // -----------------------------------------------------------------
+            // 3. BUSCAR NOTIFICAÇÕES (Alertas)
             const { data: notificacoesData, error: notifError } = await supabase
                 .from('notificacoes')
                 .select('id, titulo, mensagem, tipo, lida, created_at')
@@ -131,7 +137,6 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
             if (notifError) throw notifError;
 
-            // Mapear notificações para formato de alerta
             const alertasFormatados: Alerta[] = (notificacoesData || []).map(n => ({
                 id: n.id,
                 titulo: n.titulo,
@@ -141,34 +146,11 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 dataCriacao: n.created_at
             }));
 
-            const alertasPendentes = alertasFormatados.length;
             const alertasCriticos = alertasFormatados.filter(a =>
                 a.prioridade === 'critica' || a.prioridade === 'alta'
             ).length;
 
-            // -----------------------------------------------------------------
-            // 4. CÁLCULO DE CONFORMIDADE
-            // -----------------------------------------------------------------
-            // Fórmula: (1 - (problemas / total_itens)) * 100
-            // Problemas = exames vencidos + alertas críticos
-            // Total = funcionários ativos (mínimo 1 para evitar divisão por zero)
-            const totalItens = Math.max(totalFuncionarios, 1);
-            const problemas = examesVencidos + alertasCriticos;
-            const indiceConformidade = Math.round(
-                Math.max(0, Math.min(100, ((1 - (problemas / totalItens)) * 100)))
-            );
-
-            // -----------------------------------------------------------------
-            // 5. STATUS DO PGR (simplificado - pode ser expandido)
-            // -----------------------------------------------------------------
-            let pgrStatus: 'atualizado' | 'atencao' | 'vencido' = 'atualizado';
-            if (examesVencidos > 0 || alertasCriticos > 0) {
-                pgrStatus = examesVencidos > 3 ? 'vencido' : 'atencao';
-            }
-
-            // -----------------------------------------------------------------
-            // 6. SETORES E RISCOS
-            // -----------------------------------------------------------------
+            // 4. BUSCAR SETORES E RISCOS
             const { data: setoresData, error: setoresError } = await supabase
                 .from('setores')
                 .select('*')
@@ -182,17 +164,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                     .from('riscos')
                     .select('*')
                     .eq('empresa_id', empresaId);
-
-                if (rError) {
-                    // Se a tabela não existir (404/42P01), apenas logamos e seguimos com array vazio
-                    if (rError.code === '42P01' || (rError as any).status === 404) {
-                        console.warn('[useDashboardMetrics] Tabela "riscos" não encontrada. Módulo ainda não migrado?');
-                    } else {
-                        throw rError;
-                    }
-                } else {
-                    riscosData = rData || [];
-                }
+                if (!rError) riscosData = rData || [];
             } catch (e) {
                 console.warn('[useDashboardMetrics] Erro ao buscar riscos:', e);
             }
@@ -217,18 +189,64 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             }));
 
             // -----------------------------------------------------------------
-            // RESULTADO FINAL
+            // 4.1. AGENTE TÉCNICO (AGREGAÇÃO MECÂNICA E AVALIAÇÃO V2)
+            // -----------------------------------------------------------------
+            const workersPerSector = new Map<string, number>();
+            const workersPerRole = new Map<string, number>();
+
+            (funcionariosData as any[] || []).forEach(f => {
+                if (f.status === 'ativo') {
+                    if (f.setor_id) {
+                        workersPerSector.set(f.setor_id, (workersPerSector.get(f.setor_id) || 0) + 1);
+                    }
+                    if (f.cargo) {
+                        workersPerRole.set(f.cargo, (workersPerRole.get(f.cargo) || 0) + 1);
+                    }
+                }
+            });
+
+            const technicalResult = await runTechnicalAgent(riscosFormatados, workersPerSector, workersPerRole);
+            const totalAlertasCriticos = alertasCriticos + technicalResult.riscosCriticosCount;
+
+            // -----------------------------------------------------------------
+            // 5. MOTOR REGULATÓRIO (ÚNICA FONTE DE VERDADE)
+            // -----------------------------------------------------------------
+            const setoresComRisco = new Set(riscosFormatados.map(r => r.setor_id));
+            const setoresSemRisco = setoresFormatados.filter(s => !setoresComRisco.has(s.id)).length;
+
+            const engineResult = evaluateRegulatoryState({
+                empresaVerificada: isVerificada,
+                totalSetores: setoresFormatados.length,
+                totalFuncionarios,
+                setoresSemRisco,
+                totalRiscos: riscosFormatados.length,
+                pgrAtivo: false, // TODO: Integrar documentos PGR
+                pgrVencido: false,
+                examesVencidos,
+                alertasCriticos: totalAlertasCriticos,
+                medidasPendentes: 0
+            });
+
+            setRegulatoryState(engineResult);
+
+            // -----------------------------------------------------------------
+            // 6. MAPEAR RESULTADOS PARA COMPATIBILIDADE DA UI
             // -----------------------------------------------------------------
             setMetrics({
                 totalFuncionarios,
                 funcionariosAtivos,
-                indiceConformidade,
-                alertasPendentes,
-                alertasCriticos,
+                alertasPendentes: alertasFormatados.length,
+                alertasCriticos: totalAlertasCriticos,
                 examesVencidos,
                 examesAVencer,
-                treinamentosVencidos: 0, // Tabela não existe ainda
-                pgrStatus
+                treinamentosVencidos: 0
+            });
+
+            setOnboarding({
+                empresaCriada: isVerificada,
+                setorCadastrado: setoresFormatados.length > 0,
+                funcionarioCadastrado: totalFuncionarios > 0,
+                completouOnboarding: engineResult.progress >= 50 && !technicalResult.isCritico
             });
 
             setAlertas(alertasFormatados);
@@ -244,29 +262,14 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 setor_id: f.setor_id
             })) || []);
 
-            // -----------------------------------------------------------------
-            // 7. STATUS DE ONBOARDING REATIVO (Fase 4 - Riscos)
-            // -----------------------------------------------------------------
-            const countSetores = setoresFormatados.length;
-
-            const onboardingStatus: OnboardingStatus = {
-                empresaCriada: true,
-                setorCadastrado: countSetores > 0,
-                funcionarioCadastrado: totalFuncionarios > 0,
-                completouOnboarding: countSetores > 0 && totalFuncionarios > 0
-            };
-
-            setOnboarding(onboardingStatus);
-
         } catch (err) {
             console.error('[useDashboardMetrics] Erro ao buscar métricas:', err);
             setError(err instanceof Error ? err : new Error('Erro ao buscar dados'));
         } finally {
             setIsLoading(false);
         }
-    }, [empresaSelecionada?.empresa_id, user?.id]);
+    }, [empresaSelecionada, user?.id]);
 
-    // Buscar dados quando empresa mudar
     useEffect(() => {
         fetchMetrics();
     }, [fetchMetrics]);
@@ -280,13 +283,13 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         setores,
         riscos,
         onboarding,
+        regulatoryState,
         isLoading,
         error,
         refetch: fetchMetrics
     };
 }
 
-// Helper para mapear tipo de notificação para prioridade
 function mapTipoPrioridade(tipo: string): 'baixa' | 'media' | 'alta' | 'critica' {
     switch (tipo) {
         case 'error': return 'critica';

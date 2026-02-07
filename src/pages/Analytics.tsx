@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '@/context/AppContext';
+import { useData } from '@/context/DataContext';
 import {
   TrendingUp,
   DollarSign,
@@ -57,7 +57,7 @@ const mockBenchmark = [
 ];
 
 export function Analytics() {
-  const { metrics } = useApp();
+  const { metrics, regulatoryState } = useData();
   const [periodo, setPeriodo] = useState('12m');
   const [abaAtiva, setAbaAtiva] = useState('executivo');
 
@@ -117,11 +117,10 @@ export function Analytics() {
           <button
             key={tab.id}
             onClick={() => setAbaAtiva(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              abaAtiva === tab.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === tab.id
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
@@ -152,14 +151,14 @@ export function Analytics() {
             <div className="bg-white rounded-xl p-5 border border-gray-200">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-gray-500 text-sm">Índice de Conformidade</span>
-                <Shield className="w-5 h-5 text-green-500" />
+                <Shield className={`w-5 h-5 text-${regulatoryState?.color === 'green' ? 'green-500' : (regulatoryState?.color === 'red' ? 'red-500' : 'blue-500')}`} />
               </div>
               <div className="flex items-end gap-2">
-                <span className="text-4xl font-bold text-gray-900">{metrics.indiceConformidade}%</span>
+                <span className="text-4xl font-bold text-gray-900">{regulatoryState?.progress || 0}%</span>
               </div>
               <div className="mt-3 flex items-center gap-1 text-sm text-green-600">
                 <ArrowUpRight className="w-4 h-4" />
-                <span>+{metrics.indiceConformidade - mockAnalytics.conformidadeMercado}% vs. mercado</span>
+                <span>+{(regulatoryState?.progress || 0) - mockAnalytics.conformidadeMercado}% vs. mercado</span>
               </div>
             </div>
 
@@ -445,10 +444,9 @@ export function Analytics() {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${
-                          setor.conformidade >= 90 ? 'bg-green-500' :
+                        className={`h-full rounded-full ${setor.conformidade >= 90 ? 'bg-green-500' :
                           setor.conformidade >= 80 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
+                          }`}
                         style={{ width: `${setor.conformidade}%` }}
                       />
                     </div>
@@ -472,19 +470,18 @@ export function Analytics() {
                   {mockSetores.map((setor, j) => (
                     <div
                       key={j}
-                      className={`h-12 rounded-lg mb-2 flex items-center justify-center text-xs font-medium ${
-                        setor.risco === 'alto' && (tipo === 'Físico' || tipo === 'Acidente')
-                          ? 'bg-red-500 text-white'
-                          : setor.risco === 'médio' && tipo === 'Químico'
+                      className={`h-12 rounded-lg mb-2 flex items-center justify-center text-xs font-medium ${setor.risco === 'alto' && (tipo === 'Físico' || tipo === 'Acidente')
+                        ? 'bg-red-500 text-white'
+                        : setor.risco === 'médio' && tipo === 'Químico'
                           ? 'bg-yellow-500 text-white'
                           : 'bg-green-100 text-green-700'
-                      }`}
+                        }`}
                     >
                       {setor.risco === 'alto' && (tipo === 'Físico' || tipo === 'Acidente')
                         ? 'Alto'
                         : setor.risco === 'médio' && tipo === 'Químico'
-                        ? 'Médio'
-                        : 'Baixo'}
+                          ? 'Médio'
+                          : 'Baixo'}
                     </div>
                   ))}
                 </div>

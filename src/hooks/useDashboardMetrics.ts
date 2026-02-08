@@ -39,6 +39,7 @@ interface UseDashboardMetricsResult {
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
     exposureData: any;
+    exposureHistory: any[];
     isLoading: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
@@ -57,6 +58,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
     const [onboarding, setOnboarding] = useState<OnboardingStatus>(defaultOnboarding);
     const [regulatoryState, setRegulatoryState] = useState<RegulatoryEngineResult | null>(null);
     const [exposureData, setExposureData] = useState<any>(null);
+    const [exposureHistory, setExposureHistory] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -209,6 +211,41 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
             const technicalResult = await runTechnicalAgent(riscosFormatados, workersPerSector, workersPerRole);
             setExposureData(technicalResult);
+
+            // -----------------------------------------------------------------
+            // 4.1.1. PERSISTÊNCIA DE SNAPSHOT (MECÂNICA PHASE 6)
+            // -----------------------------------------------------------------
+            const today = new Date().toISOString().split('T')[0];
+            const { data: existingSnapshot } = await (supabase
+                .from('historico_exposicao' as any) as any)
+                .select('id')
+                .eq('empresa_id', empresaSelecionada.id)
+                .eq('data_snapshot', today)
+                .single();
+
+            if (!existingSnapshot) {
+                await (supabase
+                    .from('historico_exposicao' as any) as any)
+                    .insert({
+                        empresa_id: empresaSelecionada.id,
+                        data_snapshot: today,
+                        exposicao_total: technicalResult.exposicaoTotal,
+                        dados_setores: technicalResult.exposicaoPorSetor
+                    });
+            }
+
+            // -----------------------------------------------------------------
+            // 4.1.2. BUSCA DE HISTÓRICO (ÚLTIMOS 6 MESES)
+            // -----------------------------------------------------------------
+            const { data: historyData } = await (supabase
+                .from('historico_exposicao' as any) as any)
+                .select('*')
+                .eq('empresa_id', empresaSelecionada.id)
+                .order('data_snapshot', { ascending: true })
+                .limit(180); // Snapshots diários aprox 6 meses
+
+            setExposureHistory(historyData || []);
+
             const totalAlertasCriticos = alertasCriticos + technicalResult.riscosCriticosCount;
 
             // -----------------------------------------------------------------
@@ -288,6 +325,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         onboarding,
         regulatoryState,
         exposureData,
+        exposureHistory,
         isLoading,
         error,
         refetch: fetchMetrics

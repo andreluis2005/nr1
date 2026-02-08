@@ -12,6 +12,7 @@ import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { OnboardingDrawer } from "@/components/dashboard/OnboardingDrawer";
 import { StatusJornada } from "@/components/dashboard/StatusJornada";
 import { ExposureHeatmap } from "@/components/dashboard/ExposureHeatmap";
+import { ExposureTrendChart } from "@/components/dashboard/ExposureTrendChart";
 import { MetricCard } from "@/components/MetricCard";
 import type { LucideIcon } from 'lucide-react';
 
@@ -268,9 +269,10 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Exposure Heatmap Section */}
-      <div className="grid grid-cols-1 gap-6">
+      {/* Exposure Analytics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ExposureHeatmap />
+        <ExposureTrendChart />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -68,6 +68,13 @@ export interface TechnicalExposureResult {
     inventory: any[];
 }
 
+export interface ExposureSnapshot {
+    id: string;
+    data_snapshot: string;
+    exposicao_total: number;
+    dados_setores: Record<string, number>;
+}
+
 export interface Metrics {
     totalFuncionarios: number;
     funcionariosAtivos: number;
@@ -96,6 +103,7 @@ interface DataContextType {
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
     exposureData: TechnicalExposureResult | null;
+    exposureHistory: ExposureSnapshot[];
     isLoading: boolean;
     refetch: () => Promise<void>;
     isOnboardingOpen: boolean;
@@ -118,6 +126,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         onboarding,
         regulatoryState,
         exposureData,
+        exposureHistory,
         isLoading,
         refetch
     } = useDashboardMetrics();
@@ -134,6 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             onboarding,
             regulatoryState,
             exposureData,
+            exposureHistory,
             isLoading,
             refetch,
             isOnboardingOpen,

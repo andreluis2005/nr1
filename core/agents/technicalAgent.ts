@@ -56,7 +56,7 @@ export async function runTechnicalAgent(
   });
 
   // Agregação por função (Placeholder para mapeamento granular Risco <-> Cargo no v3)
-  workersPerRole.forEach((count, role) => {
+  workersPerRole.forEach((_, role) => {
     // No v2 apenas registramos que o cargo existe para fins de interface
     exposicaoPorFuncao[role] = 0;
   });

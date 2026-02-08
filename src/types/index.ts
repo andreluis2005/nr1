@@ -5,8 +5,8 @@ export interface Empresa {
   razaoSocial: string;
   nomeFantasia: string;
   cnpj: string;
-  cnae: string;
-  descricaoCnae: string;
+  cnae?: string;
+  descricaoCnae?: string;
   endereco: Endereco;
   contato: Contato;
   grauRisco: 1 | 2 | 3 | 4;

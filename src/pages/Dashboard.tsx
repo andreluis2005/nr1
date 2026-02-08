@@ -231,13 +231,13 @@ export function Dashboard() {
             title="Status do PGR"
             subtitle="Programa de Gerenciamento de Riscos"
             icon={FileText}
-            color={`bg-${regulatoryState?.color}-500/10 text-${regulatoryState?.color}-600`}
+            color={regulatoryState?.color ? `bg-${regulatoryState.color}-500/10 text-${regulatoryState.color}-600` : "bg-amber-500/10 text-amber-600"}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full bg-${regulatoryState?.color}-500`} />
+                <div className={`w-2 h-2 rounded-full ${regulatoryState?.color ? `bg-${regulatoryState.color}-500` : "bg-amber-500"}`} />
                 <span className="text-sm font-medium text-neutral-700">
-                  {regulatoryState?.label || 'Carregando...'}
+                  {regulatoryState?.label || 'Estrutura Incompleta'}
                 </span>
               </div>
             </div>

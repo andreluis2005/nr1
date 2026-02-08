@@ -30,23 +30,31 @@ export function NovaEmpresaDialog({
     onOpenChange: constrainedOnOpenChange,
     mode = 'create'
 }: NovaEmpresaDialogProps) {
-    const { criarEmpresa, atualizarEmpresa, empresaSelecionada } = useSupabaseAuth();
+    const { criarEmpresa, atualizarEmpresa, empresaSelecionada, user } = useSupabaseAuth();
     const [internalOpen, setInternalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const open = constrainedOpen !== undefined ? constrainedOpen : internalOpen;
+    const setOpen = constrainedOnOpenChange || setInternalOpen;
 
     const [nomeEmpresa, setNomeEmpresa] = useState('');
     const [cnpjEmpresa, setCnpjEmpresa] = useState('');
 
-    // Preencher dados se estiver em modo de verificação
+    // Preencher dados se estiver em modo de verificação ou usar metadados como fallback
     useEffect(() => {
-        if (mode === 'verify' && empresaSelecionada?.empresa) {
-            setNomeEmpresa(empresaSelecionada.empresa.nome_fantasia || '');
-            setCnpjEmpresa(empresaSelecionada.empresa.cnpj || '');
-        }
-    }, [mode, empresaSelecionada, internalOpen, constrainedOpen]);
+        if (open) {
+            if (mode === 'verify' && empresaSelecionada?.empresa) {
+                setNomeEmpresa(empresaSelecionada.empresa.nome_fantasia || '');
+                setCnpjEmpresa(empresaSelecionada.empresa.cnpj || '');
+            } else if (mode === 'create' && user?.user_metadata) {
+                const metaNome = user.user_metadata.empresa_nome || user.user_metadata.nome_empresa;
+                const metaCnpj = user.user_metadata.empresa_cnpj || user.user_metadata.cnpj;
 
-    const open = constrainedOpen !== undefined ? constrainedOpen : internalOpen;
-    const setOpen = constrainedOnOpenChange || setInternalOpen;
+                // Preencher apenas se estiver vazio para não sobrescrever
+                if (metaNome && !nomeEmpresa) setNomeEmpresa(metaNome);
+                if (metaCnpj && !cnpjEmpresa) setCnpjEmpresa(metaCnpj);
+            }
+        }
+    }, [mode, empresaSelecionada, user, internalOpen, constrainedOpen, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,7 +87,11 @@ export function NovaEmpresaDialog({
                     if (onSuccess) onSuccess();
                 }
             } else {
-                const novaEmpresa = await criarEmpresa({ nome: nomeEmpresa, cnpj: cnpjEmpresa });
+                const novaEmpresa = await criarEmpresa({
+                    nome: nomeEmpresa,
+                    cnpj: cnpjEmpresa,
+                    b_verificada: true
+                });
                 if (novaEmpresa || novaEmpresa === null) { // criarEmpresa retorna null mas atualiza o context
                     setOpen(false);
                     setNomeEmpresa('');
@@ -142,7 +154,7 @@ export function NovaEmpresaDialog({
                             Cancelar
                         </Button>
                         <Button type="submit" className="bg-primary-600 hover:bg-primary-700" disabled={isLoading}>
-                            {isLoading ? "Salvando..." : (isVerify ? "Confirmar Dados" : "Criar Empresa")}
+                            {isLoading ? "Salvando..." : "Confirmar Cadastro"}
                         </Button>
                     </DialogFooter>
                 </form>

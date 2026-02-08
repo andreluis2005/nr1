@@ -31,6 +31,7 @@ interface EmpresaVinculada {
     status: string;
     empresa_pai_id?: string | null;
     b_verificada: boolean;
+    logradouro: string | null;
   };
 }
 
@@ -57,7 +58,7 @@ interface AuthContextType {
 
   // Empresa
   selecionarEmpresa: (empresaId: string) => void;
-  criarEmpresa: (dados: { nome: string; cnpj?: string }) => Promise<EmpresaVinculada | null>;
+  criarEmpresa: (dados: { nome: string; cnpj?: string; b_verificada?: boolean }) => Promise<EmpresaVinculada | null>;
   atualizarEmpresa: (empresaId: string, dados: { nome?: string; cnpj?: string; b_verificada?: boolean }) => Promise<boolean>;
 
   // Permissões
@@ -208,8 +209,6 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
             id,
             empresa_id,
             perfil,
-            departamento,
-            matricula,
             is_principal,
             empresa:empresas (
               id,
@@ -219,7 +218,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
               logo_url,
               plano,
               status,
-              b_verificada
+              b_verificada,
+              logradouro
             )
           `)
           .eq('usuario_id', userId);
@@ -243,13 +243,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
             console.log('[Auth] ONBOARDING: Usuário sem empresa detectado. Criando para:', metaEmpresaNome);
             toast.info('Configurando sua empresa: ' + metaEmpresaNome);
             try {
-              const { data: empresaData, error: rpcError } = await (supabase as any)
+              const { error: rpcError } = await (supabase as any)
                 .rpc('criar_empresa_rpc', {
                   p_nome_fantasia: metaEmpresaNome,
                   p_cnpj: metaEmpresaCnpj || null
                 });
 
-              const novaEmpresaId = empresaData?.id;
 
               if (rpcError) {
                 console.error('[Auth] Erro no RPC criar_empresa_rpc:', rpcError);
@@ -261,7 +260,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
                 throw rpcError;
               }
 
-              console.log('[Auth] Empresa criada com sucesso via onboarding. ID:', novaEmpresaId);
+              console.log('[Auth] Empresa criada com sucesso via onboarding.');
               toast.success('Empresa configurada com sucesso!');
 
               // Pequena pausa para garantir que o BD processou o vínculo
@@ -484,13 +483,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }, [empresas]);
 
-  const criarEmpresa = useCallback(async (dados: { nome: string; cnpj?: string }): Promise<EmpresaVinculada | null> => {
+  const criarEmpresa = useCallback(async (dados: { nome: string; cnpj?: string; b_verificada?: boolean }): Promise<EmpresaVinculada | null> => {
     if (!user) return null;
     setIsLoading(true);
 
     try {
-      // Usar RPC segura
-      const { data: empresaData, error: rpcError } = await (supabase as any)
+      // 1. Usar RPC segura para criar e vincular
+      const { data: rpcData, error: rpcError } = await (supabase as any)
         .rpc('criar_empresa_rpc', {
           p_nome_fantasia: dados.nome,
           p_cnpj: dados.cnpj || null
@@ -498,12 +497,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       if (rpcError) throw rpcError;
 
-      // Marcar como verificada por padrão ao criar
-      if (empresaData?.id) {
+      // 2. Se solicitada verificação (pelo Onboarding), marcar no banco
+      if (dados.b_verificada && rpcData?.id) {
         await supabase
           .from('empresas')
           .update({ b_verificada: true } as never)
-          .eq('id', empresaData.id);
+          .eq('id', rpcData.id);
       }
 
       // Recarregar dados completos do usuário para atualizar lista de empresas

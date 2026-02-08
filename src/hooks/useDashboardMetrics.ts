@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { evaluateRegulatoryState, type RegulatoryEngineResult } from '@/domains/risks/nr1.engine';
-import { runTechnicalAgent } from '../../core/agents/technicalAgent';
+import { runTechnicalAgent } from '@/core/agents/technicalAgent';
 import type { Metrics, Alerta, Exame, Treinamento, OnboardingStatus, Setor, Risco } from '@/context/DataContext';
 
 // Dados de fallback caso não haja empresa selecionada ou erro
@@ -64,6 +64,9 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
 
     const fetchMetrics = useCallback(async () => {
         if (!empresaSelecionada?.empresa_id) {
+            setMetrics(fallbackMetrics);
+            setOnboarding(defaultOnboarding);
+            setRegulatoryState(null);
             setIsLoading(false);
             return;
         }
@@ -73,16 +76,20 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         setError(null);
 
         // Buscar status de verificação atualizado diretamente do banco
-        let isVerificada = false;
+        // Fallback para o que já temos no contexto caso a coluna b_verificada ainda não exista
+        let isVerificada = !!empresaSelecionada?.empresa?.b_verificada;
         try {
-            const { data: vData } = await supabase
+            const { data: vData, error: vError } = await supabase
                 .from('empresas')
                 .select('b_verificada')
                 .eq('id', empresaId)
                 .single() as any;
-            isVerificada = !!vData?.b_verificada;
+
+            if (!vError && vData) {
+                isVerificada = !!vData.b_verificada;
+            }
         } catch (e) {
-            console.error('[useDashboardMetrics] Erro ao buscar status de verificação:', e);
+            console.warn('[useDashboardMetrics] Erro ao buscar status de verificação (usando fallback do contexto):', e);
         }
 
         try {
@@ -102,65 +109,90 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             const funcionariosAtivos = (funcionariosData as any[] || []).filter(f => f.status === 'ativo').length || 0;
 
             // 2. BUSCAR EXAMES (ASOs)
-            const { data: asosData, error: asoError } = await supabase
-                .from('asos')
-                .select('id, funcionario_id, tipo_aso, data_validade, status')
-                .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
+            let examesFormatados: Exame[] = [];
+            let examesVencidos = 0;
+            let examesAVencer = 0;
+            try {
+                const { data: asosData, error: asoError } = await supabase
+                    .from('asos')
+                    .select('id, funcionario_id, tipo_aso, data_validade, status')
+                    .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
 
-            if (asoError) throw asoError;
+                if (!asoError && asosData) {
+                    examesVencidos = asosData.filter(a =>
+                        a.data_validade && a.data_validade < hoje
+                    ).length || 0;
 
-            const examesVencidos = asosData?.filter(a =>
-                a.data_validade && a.data_validade < hoje
-            ).length || 0;
+                    examesAVencer = asosData.filter(a =>
+                        a.data_validade &&
+                        a.data_validade >= hoje &&
+                        a.data_validade <= trintaDias
+                    ).length || 0;
 
-            const examesAVencer = asosData?.filter(a =>
-                a.data_validade &&
-                a.data_validade >= hoje &&
-                a.data_validade <= trintaDias
-            ).length || 0;
-
-            const examesFormatados: Exame[] = (asosData || []).map(aso => ({
-                id: aso.id,
-                funcionarioId: aso.funcionario_id,
-                tipo: aso.tipo_aso,
-                status: aso.data_validade && aso.data_validade < hoje
-                    ? 'vencido'
-                    : (aso.status === 'aprovado' ? 'realizado' : 'pendente'),
-                dataRealizacao: aso.data_validade || '',
-                dataVencimento: aso.data_validade || ''
-            }));
+                    examesFormatados = asosData.map(aso => ({
+                        id: aso.id,
+                        funcionarioId: aso.funcionario_id,
+                        tipo: aso.tipo_aso,
+                        status: aso.data_validade && aso.data_validade < hoje
+                            ? 'vencido'
+                            : (aso.status === 'aprovado' ? 'realizado' : 'pendente'),
+                        dataRealizacao: aso.data_validade || '',
+                        dataVencimento: aso.data_validade || ''
+                    }));
+                }
+            } catch (e) {
+                console.warn('[useDashboardMetrics] Erro ao buscar ASOS:', e);
+            }
 
             // 3. BUSCAR NOTIFICAÇÕES (Alertas)
-            const { data: notificacoesData, error: notifError } = await supabase
-                .from('notificacoes')
-                .select('id, titulo, mensagem, tipo, lida, created_at')
-                .eq('usuario_id', user?.id || '')
-                .eq('lida', false)
-                .order('created_at', { ascending: false })
-                .limit(10) as { data: any[] | null, error: any };
+            let alertasFormatados: Alerta[] = [];
+            let alertasCriticos = 0;
+            try {
+                const { data: notificacoesData, error: notifError } = await supabase
+                    .from('notificacoes')
+                    .select('id, titulo, mensagem, tipo, lida, created_at')
+                    .eq('usuario_id', user?.id || '')
+                    .eq('lida', false)
+                    .order('created_at', { ascending: false })
+                    .limit(10) as { data: any[] | null, error: any };
 
-            if (notifError) throw notifError;
+                if (!notifError && notificacoesData) {
+                    alertasFormatados = notificacoesData.map(n => ({
+                        id: n.id,
+                        titulo: n.titulo,
+                        descricao: n.mensagem,
+                        prioridade: mapTipoPrioridade(n.tipo),
+                        status: 'pendente',
+                        dataCriacao: n.created_at
+                    }));
 
-            const alertasFormatados: Alerta[] = (notificacoesData || []).map(n => ({
-                id: n.id,
-                titulo: n.titulo,
-                descricao: n.mensagem,
-                prioridade: mapTipoPrioridade(n.tipo),
-                status: 'pendente',
-                dataCriacao: n.created_at
-            }));
-
-            const alertasCriticos = alertasFormatados.filter(a =>
-                a.prioridade === 'critica' || a.prioridade === 'alta'
-            ).length;
+                    alertasCriticos = alertasFormatados.filter(a =>
+                        a.prioridade === 'critica' || a.prioridade === 'alta'
+                    ).length;
+                }
+            } catch (e) {
+                console.warn('[useDashboardMetrics] Erro ao buscar notificações:', e);
+            }
 
             // 4. BUSCAR SETORES E RISCOS
-            const { data: setoresData, error: setoresError } = await supabase
-                .from('setores')
-                .select('*')
-                .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
+            let setoresFormatados: Setor[] = [];
+            try {
+                const { data: setoresData, error: setoresError } = await supabase
+                    .from('setores')
+                    .select('*')
+                    .eq('empresa_id', empresaId) as { data: any[] | null, error: any };
 
-            if (setoresError) throw setoresError;
+                if (!setoresError && setoresData) {
+                    setoresFormatados = setoresData.map(s => ({
+                        id: s.id,
+                        nome: s.nome,
+                        descricao: s.descricao,
+                        created_at: s.created_at
+                    }));
+                }
+            } catch (e) {
+                console.warn('[useDashboardMetrics] Erro ao buscar setores:', e);
+            }
 
             let riscosData: any[] = [];
             try {
@@ -172,13 +204,6 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             } catch (e) {
                 console.warn('[useDashboardMetrics] Erro ao buscar riscos:', e);
             }
-
-            const setoresFormatados: Setor[] = (setoresData || []).map(s => ({
-                id: s.id,
-                nome: s.nome,
-                descricao: s.descricao,
-                created_at: s.created_at
-            }));
 
             const riscosFormatados: Risco[] = (riscosData || []).map(r => ({
                 id: r.id,
@@ -215,36 +240,43 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             // -----------------------------------------------------------------
             // 4.1.1. PERSISTÊNCIA DE SNAPSHOT (MECÂNICA PHASE 6)
             // -----------------------------------------------------------------
-            const today = new Date().toISOString().split('T')[0];
-            const { data: existingSnapshot } = await (supabase
-                .from('historico_exposicao' as any) as any)
-                .select('id')
-                .eq('empresa_id', empresaSelecionada.id)
-                .eq('data_snapshot', today)
-                .single();
-
-            if (!existingSnapshot) {
-                await (supabase
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const { data: existingSnapshot } = await (supabase
                     .from('historico_exposicao' as any) as any)
-                    .insert({
-                        empresa_id: empresaSelecionada.id,
-                        data_snapshot: today,
-                        exposicao_total: technicalResult.exposicaoTotal,
-                        dados_setores: technicalResult.exposicaoPorSetor
-                    });
+                    .select('id')
+                    .eq('empresa_id', empresaSelecionada.empresa_id)
+                    .eq('data_snapshot', today)
+                    .single();
+
+                if (!existingSnapshot) {
+                    await (supabase
+                        .from('historico_exposicao' as any) as any)
+                        .insert({
+                            empresa_id: empresaSelecionada.empresa_id,
+                            data_snapshot: today,
+                            exposicao_total: technicalResult.exposicaoTotal,
+                            dados_setores: technicalResult.exposicaoPorSetor
+                        });
+                }
+            } catch (snapshotErr) {
+                console.warn('[useDashboardMetrics] Erro ao salvar snapshot de exposição:', snapshotErr);
             }
 
             // -----------------------------------------------------------------
             // 4.1.2. BUSCA DE HISTÓRICO (ÚLTIMOS 6 MESES)
             // -----------------------------------------------------------------
-            const { data: historyData } = await (supabase
-                .from('historico_exposicao' as any) as any)
-                .select('*')
-                .eq('empresa_id', empresaSelecionada.id)
-                .order('data_snapshot', { ascending: true })
-                .limit(180); // Snapshots diários aprox 6 meses
-
-            setExposureHistory(historyData || []);
+            try {
+                const { data: historyData } = await (supabase
+                    .from('historico_exposicao' as any) as any)
+                    .select('*')
+                    .eq('empresa_id', empresaSelecionada.empresa_id)
+                    .order('data_snapshot', { ascending: true })
+                    .limit(180); // Snapshots diários aprox 6 meses
+                setExposureHistory(historyData || []);
+            } catch (historyErr) {
+                console.warn('[useDashboardMetrics] Erro ao buscar histórico de exposição:', historyErr);
+            }
 
             const totalAlertasCriticos = alertasCriticos + technicalResult.riscosCriticosCount;
 

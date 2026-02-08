@@ -34,7 +34,8 @@ export function OnboardingDrawer() {
         }
     }, [onboarding.completouOnboarding, isLoading, setIsOnboardingOpen]);
 
-    if (!regulatoryState) return null;
+    // regulatoryState can be null for new users without a company context
+    // if (!regulatoryState) return null;
 
     const hasCompanyContext = !!empresaSelecionada;
 
@@ -115,9 +116,9 @@ export function OnboardingDrawer() {
                                 </div>
                                 <h3 className="text-xl font-bold text-success-900 mb-2">Base Preparada!</h3>
                                 <p className="text-sm text-success-700 leading-relaxed mb-6">
-                                    {regulatoryState.label === 'Estrutura OK'
+                                    {regulatoryState?.label === 'Estrutura OK'
                                         ? "Agora que a estrutura mínima foi criada, vamos iniciar o mapeamento de riscos."
-                                        : regulatoryState.description}
+                                        : (regulatoryState?.description || "Sua base estrutural foi concluída.")}
                                 </p>
                                 <Button className="w-full bg-success-600 hover:bg-success-700" onClick={() => setIsOnboardingOpen(false)}>
                                     Continuar Jornada
@@ -165,10 +166,10 @@ export function OnboardingDrawer() {
                 <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent">
                     <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex gap-3">
                         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                        <p className="text-xs text-amber-700 leading-relaxed">
-                            <strong>Estado Atual:</strong> {regulatoryState.label}<br />
-                            {regulatoryState.nextStep}
-                        </p>
+                        <div className="text-xs text-amber-700 leading-relaxed">
+                            <strong>Estado Atual:</strong> {regulatoryState?.label || "Estrutura Incompleta"}<br />
+                            {regulatoryState?.nextStep || "Cadastre ou confirme os dados da sua empresa"}
+                        </div>
                     </div>
                 </div>
             </SheetContent>

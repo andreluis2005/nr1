@@ -112,7 +112,7 @@ export function Relatorios() {
         empresa: {
           razao_social: empresaSelecionada.empresa.razao_social || empresaSelecionada.empresa.nome_fantasia,
           cnpj: empresaSelecionada.empresa.cnpj || '',
-          cnae: (empresaSelecionada.empresa as any).cnae || '',
+          cnae: empresaSelecionada.empresa.cnae || '',
           endereco: empresaSelecionada.empresa.logradouro || ''
         },
         indicadores: {

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { 
-  CheckCircle2, 
-  Circle, 
-  Clock, 
+import {
+  CheckCircle2,
+  Circle,
+  Clock,
   AlertTriangle,
   Download,
   Edit3,
@@ -12,6 +12,7 @@ import {
   Activity,
   TrendingUp
 } from 'lucide-react';
+import type { Risco, MedidaControle } from '@/types';
 import { useApp } from '@/context/AppContext';
 import { StatusBadge } from '@/components/Badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,28 +22,42 @@ export function PGR() {
   const [showRiscos, setShowRiscos] = useState(false);
   const [showMedidas, setShowMedidas] = useState(false);
 
+  // Defensive Check: If PGR data is missing or incomplete (Safe Navigation)
+  const isPgrReady = pgr && pgr.etapaPDCA && Array.isArray(pgr.medidasControle);
+
+  if (!isPgrReady) {
+    return (
+      <div className="p-6 flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-gray-900">PGR não carregado</h2>
+          <p className="text-gray-500 mt-2">Aguardando sincronização dos dados do PGR...</p>
+        </div>
+      </div>
+    );
+  }
+
   const etapasPDCA = [
-    { 
-      key: 'planejar', 
-      label: 'Planejar', 
+    {
+      key: 'planejar',
+      label: 'Planejar',
       icon: Circle,
       desc: 'Identificação de riscos e planejamento'
     },
-    { 
-      key: 'fazer', 
-      label: 'Fazer', 
+    {
+      key: 'fazer',
+      label: 'Fazer',
       icon: Circle,
       desc: 'Implementação das medidas de controle'
     },
-    { 
-      key: 'checar', 
-      label: 'Checar', 
+    {
+      key: 'checar',
+      label: 'Checar',
       icon: Clock,
       desc: 'Monitoramento e avaliação'
     },
-    { 
-      key: 'agir', 
-      label: 'Agir', 
+    {
+      key: 'agir',
+      label: 'Agir',
       icon: Circle,
       desc: 'Ações corretivas e melhorias'
     },
@@ -51,12 +66,12 @@ export function PGR() {
   const getEtapaIndex = (etapa: string) => etapasPDCA.findIndex(e => e.key === etapa);
   const currentEtapaIndex = getEtapaIndex(pgr.etapaPDCA);
 
-  const riscosPorTipo = riscosMock.reduce((acc: Record<string, number>, risco) => {
+  const riscosPorTipo = riscosMock.reduce((acc: Record<string, number>, risco: Risco) => {
     acc[risco.tipo] = (acc[risco.tipo] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const medidasPorTipo = pgr.medidasControle.reduce((acc: Record<string, number>, medida) => {
+  const medidasPorTipo = pgr.medidasControle.reduce((acc: Record<string, number>, medida: MedidaControle) => {
     acc[medida.tipo] = (acc[medida.tipo] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -122,26 +137,24 @@ export function PGR() {
             {etapasPDCA.map((etapa, index) => {
               const isActive = index <= currentEtapaIndex;
               const isCurrent = index === currentEtapaIndex;
-              
+
               return (
                 <div key={etapa.key} className="flex items-center flex-1">
                   <div className="flex flex-col items-center">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      isCurrent 
-                        ? 'bg-blue-600 text-white ring-4 ring-blue-100' 
-                        : isActive 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-gray-100 text-gray-400'
-                    }`}>
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${isCurrent
+                      ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                      : isActive
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-100 text-gray-400'
+                      }`}>
                       {isActive && !isCurrent ? (
                         <CheckCircle2 className="w-7 h-7" />
                       ) : (
                         <etapa.icon className="w-7 h-7" />
                       )}
                     </div>
-                    <p className={`mt-2 font-medium text-sm ${
-                      isCurrent ? 'text-blue-600' : isActive ? 'text-green-600' : 'text-gray-400'
-                    }`}>
+                    <p className={`mt-2 font-medium text-sm ${isCurrent ? 'text-blue-600' : isActive ? 'text-green-600' : 'text-gray-400'
+                      }`}>
                       {etapa.label}
                     </p>
                     <p className="text-xs text-gray-500 text-center max-w-[120px] mt-1">
@@ -150,11 +163,10 @@ export function PGR() {
                   </div>
                   {index < etapasPDCA.length - 1 && (
                     <div className="flex-1 h-1 mx-4 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-500 ${
-                          index < currentEtapaIndex ? 'bg-green-500 w-full' : 
+                      <div
+                        className={`h-full transition-all duration-500 ${index < currentEtapaIndex ? 'bg-green-500 w-full' :
                           index === currentEtapaIndex ? 'bg-blue-500 w-1/2' : 'w-0'
-                        }`}
+                          }`}
                       />
                     </div>
                   )}
@@ -168,7 +180,7 @@ export function PGR() {
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Riscos Identificados */}
-        <div 
+        <div
           className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
           onClick={() => setShowRiscos(true)}
         >
@@ -191,7 +203,7 @@ export function PGR() {
         </div>
 
         {/* Medidas de Controle */}
-        <div 
+        <div
           className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
           onClick={() => setShowMedidas(true)}
         >
@@ -209,7 +221,7 @@ export function PGR() {
               <span className="font-medium text-green-600">{percentualImplementacao}%</span>
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-green-500 rounded-full transition-all duration-500"
                 style={{ width: `${percentualImplementacao}%` }}
               />
@@ -302,11 +314,11 @@ export function PGR() {
                   <div>
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold text-gray-900">{risco.agente}</h4>
-                      <StatusBadge 
-                        status={risco.grauRisco === 'critico' ? 'critica' : 
-                                risco.grauRisco === 'grave' ? 'alta' : 
-                                risco.grauRisco === 'moderado' ? 'media' : 'baixa'} 
-                        size="sm" 
+                      <StatusBadge
+                        status={risco.grauRisco === 'critico' ? 'critica' :
+                          risco.grauRisco === 'grave' ? 'alta' :
+                            risco.grauRisco === 'moderado' ? 'media' : 'baixa'}
+                        size="sm"
                       />
                     </div>
                     <p className="text-sm text-gray-600 mt-1">{risco.descricao}</p>
@@ -351,9 +363,9 @@ export function PGR() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       <h4 className="font-semibold text-gray-900">{medida.descricao}</h4>
-                      <StatusBadge 
-                        status={medida.implementada ? 'realizado' : 'pendente'} 
-                        size="sm" 
+                      <StatusBadge
+                        status={medida.implementada ? 'realizado' : 'pendente'}
+                        size="sm"
                       />
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">

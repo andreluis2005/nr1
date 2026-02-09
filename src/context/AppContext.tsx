@@ -1,9 +1,13 @@
-import { createContext, useContext, useState, useMemo, ReactNode } from "react";
-import type { Usuario, Empresa } from "@/types";
+import { createContext, useContext, useState, useMemo } from "react";
+import type { ReactNode } from "react";
+import type { Usuario, Empresa, PGR, Risco } from "@/types";
+import { pgrMock, riscosMock } from "@/data/mockData";
 
 interface AppContextType {
   usuario: Usuario | null;
   empresa: Empresa | null;
+  pgr: PGR; // Mock data for now, as per runtime behavior
+  riscosMock: Risco[]; // Mock data
   setUsuario: (usuario: Usuario | null) => void;
   setEmpresa: (empresa: Empresa | null) => void;
 }
@@ -22,6 +26,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       usuario,
       empresa,
+      pgr: pgrMock, // Providing mock data to satisfy contract
+      riscosMock,
       setUsuario,
       setEmpresa,
     }),

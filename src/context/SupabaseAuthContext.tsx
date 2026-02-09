@@ -31,6 +31,7 @@ interface EmpresaVinculada {
     status: string;
     empresa_pai_id?: string | null;
     b_verificada: boolean;
+    cnae: string | null;
     logradouro: string | null;
   };
 }
@@ -219,6 +220,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
               plano,
               status,
               b_verificada,
+              cnae,
               logradouro
             )
           `)

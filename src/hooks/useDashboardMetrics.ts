@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { evaluateRegulatoryState, type RegulatoryEngineResult } from '@/domains/risks/nr1.engine';
 import { runTechnicalAgent } from '@/core/agents/technicalAgent';
-import type { Metrics, Alerta, Exame, Treinamento, OnboardingStatus, Setor, Risco } from '@/context/DataContext';
+import type { Metrics, Alerta, Exame, Treinamento, OnboardingStatus, Setor, Risco, MedidaControle } from '@/types';
 
 // Dados de fallback caso não haja empresa selecionada ou erro
 const fallbackMetrics: Metrics = {
@@ -36,6 +36,7 @@ interface UseDashboardMetricsResult {
     funcionarios: any[];
     setores: Setor[];
     riscos: Risco[];
+    medidasControle: MedidaControle[];
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
     exposureData: any;
@@ -55,6 +56,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
     const [funcionarios, setFuncionarios] = useState<any[]>([]);
     const [setores, setSetores] = useState<Setor[]>([]);
     const [riscos, setRiscos] = useState<Risco[]>([]);
+    const [medidasControle, setMedidasControle] = useState<MedidaControle[]>([]);
     const [onboarding, setOnboarding] = useState<OnboardingStatus>(defaultOnboarding);
     const [regulatoryState, setRegulatoryState] = useState<RegulatoryEngineResult | null>(null);
     const [exposureData, setExposureData] = useState<any>(null);
@@ -195,30 +197,64 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             }
 
             let riscosData: any[] = [];
+            let medidasData: any[] = [];
+
             try {
+                // Fetch risks
                 const { data: rData, error: rError } = await supabase
                     .from('riscos')
                     .select('*')
                     .eq('empresa_id', empresaId);
                 if (!rError) riscosData = rData || [];
+
+                // Fetch measures (AVOID JOIN COLLISION with legacy column)
+                const { data: mData, error: mError } = await supabase
+                    .from('medidas_controle')
+                    .select('*')
+                    .eq('empresa_id', empresaId);
+                if (!mError) medidasData = mData || [];
+
             } catch (e) {
-                console.warn('[useDashboardMetrics] Erro ao buscar riscos:', e);
+                console.warn('[useDashboardMetrics] Erro ao buscar riscos/medidas:', e);
             }
 
-            const riscosFormatados: Risco[] = (riscosData || []).map(r => ({
-                id: r.id,
-                setor_id: r.setor_id,
-                categoria: r.categoria,
-                nome: r.nome,
-                descricao: r.descricao,
-                severidade: r.severidade,
-                probabilidade: r.probabilidade,
-                medidas_controle: r.medidas_controle,
-                status: r.status
+            // Map measures directly
+            const allMedidas: MedidaControle[] = medidasData.map((m: any) => ({
+                id: m.id,
+                riscoId: m.risco_id,
+                empresaId: m.empresa_id,
+                tipo: m.tipo,
+                descricao: m.descricao,
+                dataPrevista: m.data_prevista,
+                dataConclusao: m.data_conclusao,
+                responsavel: m.responsavel,
+                status: m.status,
+                eficaz: m.eficaz
             }));
 
+            const riscosFormatados: Risco[] = (riscosData || []).map(r => {
+                return {
+                    id: r.id,
+                    tipo: (r.tipo_risco || r.categoria || 'acidente') as any,
+                    agente: r.agente || r.nome,
+                    descricao: r.descricao,
+                    // UI & DB Fields
+                    nome: r.nome,
+                    categoria: r.categoria,
+                    severidade: r.severidade,
+                    probabilidade: r.probabilidade,
+                    setor_id: r.setor_id,
+
+                    setores: [],
+                    funcoes: [],
+                    medidasPreventivas: [],
+                    grauRisco: r.severidade >= 4 ? 'critico' : r.severidade === 3 ? 'grave' : r.severidade === 2 ? 'moderado' : 'leve',
+                    medidas_controle: r.medidas_controle // Legacy text field
+                };
+            });
+
             // -----------------------------------------------------------------
-            // 4.1. AGENTE TÉCNICO (AGREGAÇÃO MECÂNICA E AVALIAÇÃO V2)
+            // 4.1. AGENTE TÉCNICO
             // -----------------------------------------------------------------
             const workersPerSector = new Map<string, number>();
             const workersPerRole = new Map<string, number>();
@@ -234,18 +270,30 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 }
             });
 
-            const technicalResult = await runTechnicalAgent(riscosFormatados, workersPerSector, workersPerRole);
+            // ADAPTER: Risco -> TechnicalRisk (Strict Type Guard)
+            const technicalRisks = riscosFormatados
+                .filter(r => r.setor_id) // Required by technical agent
+                .map(r => ({
+                    id: r.id,
+                    setor_id: r.setor_id as string,
+                    nome: r.nome ?? 'Risco não identificado',
+                    severidade: r.severidade ?? 1,
+                    probabilidade: r.probabilidade ?? 1,
+                    categoria: r.categoria ?? 'nao_classificado'
+                }));
+
+            const technicalResult = await runTechnicalAgent(technicalRisks, workersPerSector, workersPerRole);
             setExposureData(technicalResult);
 
             // -----------------------------------------------------------------
-            // 4.1.1. PERSISTÊNCIA DE SNAPSHOT (MECÂNICA PHASE 6)
+            // 4.1.1. SNAPSHOT
             // -----------------------------------------------------------------
             try {
                 const today = new Date().toISOString().split('T')[0];
                 const { data: existingSnapshot } = await (supabase
                     .from('historico_exposicao' as any) as any)
                     .select('id')
-                    .eq('empresa_id', empresaSelecionada.empresa_id)
+                    .eq('empresa_id', empresaId)
                     .eq('data_snapshot', today)
                     .single();
 
@@ -253,7 +301,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                     await (supabase
                         .from('historico_exposicao' as any) as any)
                         .insert({
-                            empresa_id: empresaSelecionada.empresa_id,
+                            empresa_id: empresaId,
                             data_snapshot: today,
                             exposicao_total: technicalResult.exposicaoTotal,
                             dados_setores: technicalResult.exposicaoPorSetor
@@ -264,15 +312,15 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             }
 
             // -----------------------------------------------------------------
-            // 4.1.2. BUSCA DE HISTÓRICO (ÚLTIMOS 6 MESES)
+            // 4.1.2. HISTÓRICO
             // -----------------------------------------------------------------
             try {
                 const { data: historyData } = await (supabase
                     .from('historico_exposicao' as any) as any)
                     .select('*')
-                    .eq('empresa_id', empresaSelecionada.empresa_id)
+                    .eq('empresa_id', empresaId)
                     .order('data_snapshot', { ascending: true })
-                    .limit(180); // Snapshots diários aprox 6 meses
+                    .limit(180);
                 setExposureHistory(historyData || []);
             } catch (historyErr) {
                 console.warn('[useDashboardMetrics] Erro ao buscar histórico de exposição:', historyErr);
@@ -281,7 +329,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             const totalAlertasCriticos = alertasCriticos + technicalResult.riscosCriticosCount;
 
             // -----------------------------------------------------------------
-            // 5. MOTOR REGULATÓRIO (ÚNICA FONTE DE VERDADE)
+            // 5. MOTOR REGULATÓRIO
             // -----------------------------------------------------------------
             const setoresComRisco = new Set(riscosFormatados.map(r => r.setor_id));
             const setoresSemRisco = setoresFormatados.filter(s => !setoresComRisco.has(s.id)).length;
@@ -292,7 +340,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 totalFuncionarios,
                 setoresSemRisco,
                 totalRiscos: riscosFormatados.length,
-                pgrAtivo: false, // TODO: Integrar documentos PGR
+                pgrAtivo: false,
                 pgrVencido: false,
                 examesVencidos,
                 alertasCriticos: totalAlertasCriticos,
@@ -302,7 +350,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             setRegulatoryState(engineResult);
 
             // -----------------------------------------------------------------
-            // 6. MAPEAR RESULTADOS PARA COMPATIBILIDADE DA UI
+            // 6. MAPEAR RESULTADOS
             // -----------------------------------------------------------------
             setMetrics({
                 totalFuncionarios,
@@ -318,7 +366,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
                 empresaCriada: isVerificada,
                 setorCadastrado: setoresFormatados.length > 0,
                 funcionarioCadastrado: totalFuncionarios > 0,
-                completouOnboarding: engineResult.progress >= 50 && !technicalResult.isCritico
+                completouOnboarding: engineResult.state !== 'ESTRUTURA_INCOMPLETA' && !technicalResult.isCritico
             });
 
             setAlertas(alertasFormatados);
@@ -326,6 +374,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
             setTreinamentos([]);
             setSetores(setoresFormatados);
             setRiscos(riscosFormatados);
+            setMedidasControle(allMedidas);
             setFuncionarios((funcionariosData as any[])?.map(f => ({
                 id: f.id,
                 nome_completo: f.nome_completo,
@@ -354,6 +403,7 @@ export function useDashboardMetrics(): UseDashboardMetricsResult {
         funcionarios,
         setores,
         riscos,
+        medidasControle,
         onboarding,
         regulatoryState,
         exposureData,

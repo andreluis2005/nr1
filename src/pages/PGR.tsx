@@ -5,84 +5,121 @@ import {
   Clock,
   AlertTriangle,
   Download,
-  Edit3,
   ChevronRight,
   Shield,
   Users,
   Activity,
-  TrendingUp
+  TrendingUp,
+  Ban,
+  Bookmark
 } from 'lucide-react';
-import type { Risco, MedidaControle } from '@/types';
-import { useApp } from '@/context/AppContext';
+import { useData } from '@/context/DataContext';
 import { StatusBadge } from '@/components/Badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { Badge } from "@/components/ui/badge";
+import { ActionPlanModal } from '@/components/pgr/ActionPlanModal';
+import type { Risco } from '@/types';
 
 export function PGR() {
-  const { pgr, riscosMock } = useApp();
+  const { metrics, riscos, setores, medidasControle, regulatoryState, isLoading, refetch } = useData();
   const [showRiscos, setShowRiscos] = useState(false);
   const [showMedidas, setShowMedidas] = useState(false);
 
-  // Defensive Check: If PGR data is missing or incomplete (Safe Navigation)
-  const isPgrReady = pgr && pgr.etapaPDCA && Array.isArray(pgr.medidasControle);
+  // Action Plan Modal State
+  const [selectedRisk, setSelectedRisk] = useState<Risco | null>(null);
+  const [isActionPlanOpen, setIsActionPlanOpen] = useState(false);
 
-  if (!isPgrReady) {
+  if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center h-full">
         <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-900">PGR não carregado</h2>
-          <p className="text-gray-500 mt-2">Aguardando sincronização dos dados do PGR...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Carregando dados do PGR...</p>
         </div>
       </div>
     );
   }
 
+  // Use measures from context, which are flat and clean
+  const allStructuredMeasures = medidasControle || [];
+
+  // Count legacy measures (risks with text but no structured measures yet? or just count all legacy text fields)
+  const legacyMeasuresCount = riscos.filter(r => r.medidas_controle && r.medidas_controle.trim().length > 0).length;
+
+  // Implementation Rate (Structured Only)
+  const completedMeasures = allStructuredMeasures.filter(m => m.status === 'concluido').length;
+  const implementationRate = allStructuredMeasures.length > 0
+    ? Math.round((completedMeasures / allStructuredMeasures.length) * 100)
+    : 0;
+
   const etapasPDCA = [
-    {
-      key: 'planejar',
-      label: 'Planejar',
-      icon: Circle,
-      desc: 'Identificação de riscos e planejamento'
-    },
-    {
-      key: 'fazer',
-      label: 'Fazer',
-      icon: Circle,
-      desc: 'Implementação das medidas de controle'
-    },
-    {
-      key: 'checar',
-      label: 'Checar',
-      icon: Clock,
-      desc: 'Monitoramento e avaliação'
-    },
-    {
-      key: 'agir',
-      label: 'Agir',
-      icon: Circle,
-      desc: 'Ações corretivas e melhorias'
-    },
+    { key: 'planejar', label: 'Planejar', icon: Circle, desc: 'Identificação e Planejamento' },
+    { key: 'fazer', label: 'Fazer', icon: Circle, desc: 'Execução do Plano de Ação' },
+    { key: 'checar', label: 'Checar', icon: Clock, desc: 'Monitoramento e Auditoria' },
+    { key: 'agir', label: 'Agir', icon: Circle, desc: 'Correções e Melhorias' },
   ];
 
+  const getCurrentEtapa = () => {
+    const hasPendingMeasures = allStructuredMeasures.some(m => m.status === 'planejado' || m.status === 'em_andamento' || m.status === 'atrasado');
+
+    if (!regulatoryState) return 'planejar';
+    if (regulatoryState.state === 'ESTRUTURA_INCOMPLETA') return 'planejar';
+    if (regulatoryState.state === 'MAPEAMENTO_PENDENTE') return 'planejar';
+
+    if (riscos.length > 0 && allStructuredMeasures.length === 0) return 'planejar';
+    if (hasPendingMeasures) return 'fazer';
+    if (regulatoryState.state === 'INVENTARIO_PENDENTE') return 'fazer';
+    if (regulatoryState.state === 'CONFORME_PARCIAL') return 'checar';
+    if (regulatoryState.state === 'CONFORME_OURO') return 'agir';
+
+    return 'planejar';
+  };
+
+  const currentEtapa = getCurrentEtapa();
   const getEtapaIndex = (etapa: string) => etapasPDCA.findIndex(e => e.key === etapa);
-  const currentEtapaIndex = getEtapaIndex(pgr.etapaPDCA);
+  const currentEtapaIndex = getEtapaIndex(currentEtapa);
 
-  const riscosPorTipo = riscosMock.reduce((acc: Record<string, number>, risco: Risco) => {
-    acc[risco.tipo] = (acc[risco.tipo] || 0) + 1;
+  const riscosPorTipo = riscos.reduce((acc: Record<string, number>, risco) => {
+    const tipo = risco.categoria || 'outros';
+    acc[tipo] = (acc[tipo] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const medidasPorTipo = pgr.medidasControle.reduce((acc: Record<string, number>, medida: MedidaControle) => {
-    acc[medida.tipo] = (acc[medida.tipo] || 0) + 1;
+  // Chart Data: Measures by Type
+  const medidasPorTipo = allStructuredMeasures.reduce((acc, m) => {
+    acc[m.tipo] = (acc[m.tipo] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const medidasImplementadas = pgr.medidasControle.filter(m => m.implementada).length;
-  const percentualImplementacao = Math.round((medidasImplementadas / pgr.medidasControle.length) * 100);
+  const pgrAtivo = regulatoryState?.state === 'CONFORME_OURO' || regulatoryState?.state === 'CONFORME_PARCIAL';
+
+  const handleOpenActionPlan = (risco: Risco) => {
+    setSelectedRisk(risco);
+    setIsActionPlanOpen(true);
+    setShowRiscos(false);
+  };
+
+  const handleExportPDF = () => {
+    if (!pgrAtivo) {
+      toast.error("O PGR precisa estar consolidado para gerar o PDF.");
+      return;
+    }
+    toast.info("Geração de PDF será implementada na próxima fase.");
+  };
 
   return (
     <div className="p-6 space-y-6">
+      <ActionPlanModal
+        isOpen={isActionPlanOpen}
+        onClose={() => setIsActionPlanOpen(false)}
+        risco={selectedRisk}
+        onUpdate={refetch}
+      />
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             PGR - Programa de Gerenciamento de Riscos
@@ -92,57 +129,70 @@ export function PGR() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            <Download className="w-4 h-4" />
+          <Button
+            variant="outline"
+            onClick={handleExportPDF}
+            disabled={!pgrAtivo}
+            className="flex items-center gap-2"
+            title={!pgrAtivo ? "Complete o PGR para exportar" : "Exportar documento oficial"}
+          >
+            {pgrAtivo ? <Download className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
             Exportar PDF
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-            <Edit3 className="w-4 h-4" />
-            Editar PGR
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Status Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
               <Shield className="w-8 h-8 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold">PGR {pgr.status === 'ativo' ? 'Ativo' : 'Em Revisão'}</h2>
-                <StatusBadge status={pgr.status === 'ativo' ? 'atualizado' : 'atencao'} size="md" />
+              <div className="flex items-center gap-3 mb-1">
+                <h2 className="text-xl font-bold">PGR {pgrAtivo ? 'Ativo' : 'Em Elaboração'}</h2>
+                <StatusBadge
+                  status={pgrAtivo ? 'atualizado' : 'atencao'}
+                  size="md"
+                />
               </div>
-              <p className="text-blue-100 mt-1">
-                Versão {pgr.versao} • Última revisão: {new Date(pgr.dataRevisao).toLocaleDateString('pt-BR')}
+              <p className="text-blue-100 text-sm">
+                Status Regulatório: {regulatoryState?.label || 'Analisando...'}
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-blue-100">Responsável</p>
-            <p className="font-medium">{pgr.responsavel}</p>
+
+          <div className="flex gap-8 text-right bg-white/10 p-4 rounded-lg backdrop-blur-sm">
+            <div className="text-center">
+              <p className="text-xs text-blue-200 uppercase tracking-wider mb-1">Ações Pendentes</p>
+              <p className="font-semibold text-xl">{allStructuredMeasures.filter(m => m.status !== 'concluido').length}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-blue-200 uppercase tracking-wider mb-1">Validade</p>
+              <p className="font-semibold text-xl">{pgrAtivo ? '24 meses' : '-'}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Ciclo PDCA */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-gray-400" />
           Ciclo PDCA - Gestão Contínua
         </h2>
-        <div className="relative">
+        <div className="relative px-4">
           <div className="flex items-center justify-between">
             {etapasPDCA.map((etapa, index) => {
               const isActive = index <= currentEtapaIndex;
               const isCurrent = index === currentEtapaIndex;
 
               return (
-                <div key={etapa.key} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${isCurrent
-                      ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                <div key={etapa.key} className="flex items-center flex-1 last:flex-none last:w-auto md:last:flex-1">
+                  <div className="flex flex-col items-center relative z-10">
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${isCurrent
+                      ? 'bg-blue-600 text-white ring-4 ring-blue-100 scale-110'
                       : isActive
                         ? 'bg-green-500 text-white'
                         : 'bg-gray-100 text-gray-400'
@@ -153,16 +203,16 @@ export function PGR() {
                         <etapa.icon className="w-7 h-7" />
                       )}
                     </div>
-                    <p className={`mt-2 font-medium text-sm ${isCurrent ? 'text-blue-600' : isActive ? 'text-green-600' : 'text-gray-400'
+                    <p className={`mt-3 font-medium text-sm ${isCurrent ? 'text-blue-600' : isActive ? 'text-green-600' : 'text-gray-400'
                       }`}>
                       {etapa.label}
                     </p>
-                    <p className="text-xs text-gray-500 text-center max-w-[120px] mt-1">
+                    <p className="text-xs text-gray-500 text-center max-w-[120px] mt-1 hidden md:block">
                       {etapa.desc}
                     </p>
                   </div>
                   {index < etapasPDCA.length - 1 && (
-                    <div className="flex-1 h-1 mx-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1 mx-4 bg-gray-100 rounded-full overflow-hidden relative -top-6 md:-top-8">
                       <div
                         className={`h-full transition-all duration-500 ${index < currentEtapaIndex ? 'bg-green-500 w-full' :
                           index === currentEtapaIndex ? 'bg-blue-500 w-1/2' : 'w-0'
@@ -181,19 +231,19 @@ export function PGR() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Riscos Identificados */}
         <div
-          className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+          className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group"
           onClick={() => setShowRiscos(true)}
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center group-hover:bg-red-100 transition-colors">
               <AlertTriangle className="w-6 h-6 text-red-600" />
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Riscos Identificados</h3>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{riscosMock.length}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{riscos.length}</p>
           <div className="mt-4 space-y-2">
-            {Object.entries(riscosPorTipo).map(([tipo, count]) => (
+            {Object.entries(riscosPorTipo).slice(0, 3).map(([tipo, count]) => (
               <div key={tipo} className="flex items-center justify-between text-sm">
                 <span className="text-gray-500 capitalize">{tipo}</span>
                 <span className="font-medium text-gray-900">{count}</span>
@@ -204,28 +254,33 @@ export function PGR() {
 
         {/* Medidas de Controle */}
         <div
-          className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+          className="bg-white rounded-xl border border-gray-200 p-6 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all group"
           onClick={() => setShowMedidas(true)}
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center group-hover:bg-green-100 transition-colors">
               <Shield className="w-6 h-6 text-green-600" />
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Medidas de Controle</h3>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{pgr.medidasControle.length}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{allStructuredMeasures.length}</p>
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-500">Implementadas</span>
-              <span className="font-medium text-green-600">{percentualImplementacao}%</span>
+              <span className="text-gray-500">Taxa de Conclusão</span>
+              <span className="font-medium text-green-600">{implementationRate}%</span>
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-green-500 rounded-full transition-all duration-500"
-                style={{ width: `${percentualImplementacao}%` }}
+                style={{ width: `${implementationRate}%` }}
               />
             </div>
+            {legacyMeasuresCount > 0 && (
+              <p className="text-xs text-amber-600 mt-2">
+                + {legacyMeasuresCount} medidas não estruturadas
+              </p>
+            )}
           </div>
         </div>
 
@@ -236,149 +291,173 @@ export function PGR() {
               <Activity className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Estatísticas</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Compliance</h3>
           <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors">
               <div className="flex items-center gap-3">
                 <Users className="w-5 h-5 text-gray-400" />
-                <span className="text-sm text-gray-600">Funcionários cobertos</span>
+                <span className="text-sm text-gray-600">Funcionários</span>
               </div>
-              <span className="font-medium text-gray-900">127</span>
+              <span className="font-bold text-gray-900">{metrics.totalFuncionarios}</span>
             </div>
-            <div className="flex items-center justify-between">
+
+            <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors">
               <div className="flex items-center gap-3">
                 <TrendingUp className="w-5 h-5 text-gray-400" />
-                <span className="text-sm text-gray-600">Taxa de implementação</span>
+                <span className="text-sm text-gray-600">Ambientes</span>
               </div>
-              <span className="font-medium text-green-600">{percentualImplementacao}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-gray-400" />
-                <span className="text-sm text-gray-600">Dias desde revisão</span>
-              </div>
-              <span className="font-medium text-gray-900">
-                {Math.ceil((new Date().getTime() - new Date(pgr.dataRevisao).getTime()) / (1000 * 60 * 60 * 24))}
-              </span>
+              <span className="font-bold text-gray-900">{setores.length}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Hierarquia de Controles */}
+      {/* Hierarquia de Controles (REAL DATA in Phase 9) */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">
-          Hierarquia de Controles
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 font-mono">
+          Hierarquia de Controles (Dados Reais)
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
-            { tipo: 'eliminacao', label: 'Eliminação', count: medidasPorTipo['eliminacao'] || 0, color: 'bg-green-500' },
-            { tipo: 'substituicao', label: 'Substituição', count: medidasPorTipo['substituicao'] || 0, color: 'bg-green-400' },
-            { tipo: 'engenharia', label: 'Engenharia', count: medidasPorTipo['engenharia'] || 0, color: 'bg-yellow-500' },
-            { tipo: 'administrativa', label: 'Administrativa', count: medidasPorTipo['administrativa'] || 0, color: 'bg-orange-500' },
-            { tipo: 'epi', label: 'EPI', count: medidasPorTipo['epi'] || 0, color: 'bg-red-500' },
-          ].map((controle, index) => (
-            <div key={controle.tipo} className="relative">
-              <div className={`${controle.color} rounded-xl p-4 text-white`}>
-                <p className="text-sm font-medium opacity-90">{index + 1}º</p>
+            { key: 'eliminacao', label: 'Eliminação', color: 'bg-green-600' },
+            { key: 'substituicao', label: 'Substituição', color: 'bg-green-500' },
+            { key: 'engenharia', label: 'Engenharia', color: 'bg-yellow-500' },
+            { key: 'administrativa', label: 'Administrativa', color: 'bg-orange-500' },
+            { key: 'epi', label: 'EPI', color: 'bg-red-500' },
+          ].map((controle, index) => {
+            const count = medidasPorTipo[controle.key] || 0;
+            return (
+              <div key={index} className={`${controle.color} rounded-xl p-4 text-white shadow-sm`}>
+                <p className="text-sm font-medium opacity-90 text-white/90">{index + 1}º Prioridade</p>
                 <p className="text-lg font-bold mt-1">{controle.label}</p>
-                <p className="text-2xl font-bold mt-2">{controle.count}</p>
-                <p className="text-sm opacity-75">medidas</p>
+                <p className="text-3xl font-bold mt-2">{count}</p>
               </div>
-              {index < 4 && (
-                <div className="hidden md:block absolute top-1/2 -right-2 transform -translate-y-1/2 z-10">
-                  <ChevronRight className="w-6 h-6 text-gray-300" />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
-        <p className="text-sm text-gray-500 mt-4 text-center">
-          Ordem de prioridade: Eliminação → Substituição → Engenharia → Administrativa → EPI
-        </p>
+        <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+          <span>* Baseado nas medidas estruturadas do plano de ação.</span>
+          {medidasPorTipo['nao_classificado'] ? (
+            <span>+ {medidasPorTipo['nao_classificado']} medidas não classificadas</span>
+          ) : null}
+        </div>
       </div>
 
-      {/* Dialog - Riscos */}
+      {/* Dialog - Riscos & Action Plan Trigger */}
       <Dialog open={showRiscos} onOpenChange={setShowRiscos}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-3">
               <AlertTriangle className="w-6 h-6 text-red-600" />
-              Riscos Identificados
+              Gerenciar Riscos e Medidas
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            {riscosMock.map((risco) => (
-              <div key={risco.id} className="border border-gray-200 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-semibold text-gray-900">{risco.agente}</h4>
-                      <StatusBadge
-                        status={risco.grauRisco === 'critico' ? 'critica' :
-                          risco.grauRisco === 'grave' ? 'alta' :
-                            risco.grauRisco === 'moderado' ? 'media' : 'baixa'}
-                        size="sm"
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{risco.descricao}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span>Tipo: <span className="capitalize">{risco.tipo}</span></span>
-                      {risco.limiteTolerancia && (
-                        <span>Limite: {risco.limiteTolerancia}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-gray-700">Medidas Preventivas:</p>
-                  <ul className="mt-1 space-y-1">
-                    {risco.medidasPreventivas.map((medida, idx) => (
-                      <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                        {medida}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            {riscos.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Nenhum risco identificado ainda.
               </div>
-            ))}
+            ) : (
+              riscos.map((risco) => {
+                const medidasDesteRisco = allStructuredMeasures.filter(m => m.riscoId === risco.id);
+                const severidade = risco.severidade ?? 0;
+                return (
+                  <div key={risco.id} className="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-semibold text-gray-900">{risco.nome}</h4>
+                          <StatusBadge
+                            status={
+                              severidade >= 4 ? 'critica' :
+                                severidade === 3 ? 'alta' :
+                                  severidade === 2 ? 'media' : 'baixa'
+                            }
+                            size="sm"
+                          />
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{risco.descricao}</p>
+
+                        {/* Structured Measures Summary */}
+                        {(medidasDesteRisco.length || 0) > 0 && (
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {medidasDesteRisco.length} medidas planejadas
+                            </Badge>
+                            {medidasDesteRisco.some(m => m.status === 'concluido') && (
+                              <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-700">
+                                {medidasDesteRisco.filter(m => m.status === 'concluido').length} concluídas
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2 text-blue-600 hover:bg-blue-50"
+                        onClick={() => handleOpenActionPlan(risco)}
+                      >
+                        <Bookmark className="w-4 h-4" /> Plano de Ação
+                      </Button>
+                    </div>
+
+                    {/* Legacy Text Warning */}
+                    {risco.medidas_controle && (
+                      <div className="mt-3 bg-gray-50 p-2 rounded border border-gray-100 text-xs text-gray-500">
+                        <span className="font-semibold">Legado:</span> {risco.medidas_controle}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog - Medidas */}
+      {/* Dialog - Just simple list of measures (Read Only view for aggregation) */}
       <Dialog open={showMedidas} onOpenChange={setShowMedidas}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-3">
               <Shield className="w-6 h-6 text-green-600" />
-              Medidas de Controle
+              Medidas de Controle (Consolidado)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            {pgr.medidasControle.map((medida) => (
-              <div key={medida.id} className="border border-gray-200 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-semibold text-gray-900">{medida.descricao}</h4>
-                      <StatusBadge
-                        status={medida.implementada ? 'realizado' : 'pendente'}
-                        size="sm"
-                      />
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span className="capitalize">Tipo: {medida.tipo}</span>
-                      <span>Responsável: {medida.responsavel}</span>
-                      {medida.dataImplementacao && (
-                        <span>Implementado: {new Date(medida.dataImplementacao).toLocaleDateString('pt-BR')}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            {allStructuredMeasures.length === 0 && legacyMeasuresCount === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Nenhuma medida cadastrada.
               </div>
-            ))}
+            ) : (
+              <>
+                {allStructuredMeasures.map((medida, idx) => (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-3 flex justify-between items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">{medida.tipo.replace('_', ' ')}</Badge>
+                        <span className="text-sm font-medium">{medida.descricao}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Responsável: {medida.responsavel || '-'}</p>
+                    </div>
+                    <StatusBadge status={medida.status === 'concluido' ? 'concluido' : 'pendente'} size="sm" />
+                  </div>
+                ))}
+
+                {legacyMeasuresCount > 0 && (
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <h4 className="text-sm font-bold text-gray-700 mb-2">Medidas Não Estruturadas (Legado)</h4>
+                    {riscos.filter(r => r.medidas_controle).map(r => (
+                      <div key={r.id} className="text-sm text-gray-500 mb-1 pl-2 border-l-2 border-amber-200">
+                        {r.medidas_controle}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

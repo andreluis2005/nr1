@@ -1,5 +1,22 @@
 // Tipos principais do NR1 Pro
 
+export interface Metrics {
+  totalFuncionarios: number;
+  funcionariosAtivos: number;
+  alertasPendentes: number;
+  alertasCriticos: number;
+  examesVencidos: number;
+  examesAVencer: number;
+  treinamentosVencidos: number;
+}
+
+export interface OnboardingStatus {
+  empresaCriada: boolean;
+  setorCadastrado: boolean;
+  funcionarioCadastrado: boolean;
+  completouOnboarding: boolean;
+}
+
 export interface Empresa {
   id: string;
   razaoSocial: string;
@@ -32,27 +49,29 @@ export interface Contato {
 
 export interface Funcionario {
   id: string;
-  nome: string;
-  cpf: string;
+  nome: string; // Legacy
+  nome_completo?: string; // UI usage
+  cpf?: string;
   matricula: string;
-  dataAdmissao: string;
-  dataNascimento: string;
+  dataAdmissao?: string;
+  dataNascimento?: string;
   cargo: string;
-  setor: string;
+  setor: string; // Legacy name match
+  setor_id?: string; // DB match
   status: 'ativo' | 'afastado' | 'ferias' | 'demissional';
-  sexo: 'M' | 'F';
-  exames: Exame[];
-  treinamentos: Treinamento[];
+  sexo?: 'M' | 'F';
+  exames?: Exame[];
+  treinamentos?: Treinamento[];
 }
 
 export interface Exame {
   id: string;
   funcionarioId: string;
-  tipo: 'admissional' | 'periodico' | 'demissional' | 'retorno' | 'mudanca_funcao';
+  tipo: string;
   dataRealizacao: string;
   dataVencimento: string;
   status: 'agendado' | 'realizado' | 'vencido' | 'pendente';
-  clinica: string;
+  clinica?: string;
   resultado?: string;
   observacoes?: string;
 }
@@ -65,20 +84,31 @@ export interface Treinamento {
   dataRealizacao: string;
   dataVencimento: string;
   cargaHoraria: number;
-  instrutor: string;
+  instrutor?: string;
   status: 'vigente' | 'vencido' | 'agendado';
 }
 
 export interface Risco {
   id: string;
+  // Core Interface
   tipo: 'fisico' | 'quimico' | 'biologico' | 'ergonomico' | 'acidente';
   agente: string;
   descricao: string;
+  grauRisco: 'leve' | 'moderado' | 'grave' | 'critico';
+
+  // UI & DB Fields
+  nome?: string;
+  categoria?: string;
+  severidade?: number;
+  probabilidade?: number;
+  setor_id?: string;
+
+  // Arrays & Relations
   setores: string[];
   funcoes: string[];
   limiteTolerancia?: string;
   medidasPreventivas: string[];
-  grauRisco: 'leve' | 'moderado' | 'grave' | 'critico';
+  medidas_controle?: string; // Legacy text field
 }
 
 export interface PGR {
@@ -97,20 +127,23 @@ export interface PGR {
 export interface MedidaControle {
   id: string;
   riscoId: string;
-  tipo: 'eliminacao' | 'substituicao' | 'engenharia' | 'administrativa' | 'epi';
+  empresaId?: string;
+  tipo: 'eliminacao' | 'substituicao' | 'engenharia' | 'administrativa' | 'epi' | 'nao_classificado';
   descricao: string;
-  implementada: boolean;
-  dataImplementacao?: string;
-  responsavel: string;
+  dataPrevista?: string;
+  dataConclusao?: string;
+  responsavel?: string;
+  status: 'planejado' | 'em_andamento' | 'concluido' | 'atrasado';
+  eficaz?: boolean;
 }
 
 export interface Alerta {
   id: string;
-  tipo: 'exame' | 'treinamento' | 'pgr' | 'documento' | 'multa';
+  tipo?: 'exame' | 'treinamento' | 'pgr' | 'documento' | 'multa';
   titulo: string;
   descricao: string;
   dataCriacao: string;
-  dataVencimento: string;
+  dataVencimento?: string;
   prioridade: 'baixa' | 'media' | 'alta' | 'critica';
   status: 'pendente' | 'em_andamento' | 'resolvido' | 'ignorado';
   funcionarioId?: string;
@@ -166,8 +199,9 @@ export interface Setor {
   id: string;
   nome: string;
   descricao?: string;
-  funcoes: Funcao[];
-  riscos: string[]; // IDs dos riscos
+  created_at?: string; // DB field
+  funcoes?: Funcao[];
+  riscos?: string[]; // IDs dos riscos
 }
 
 export interface Funcao {

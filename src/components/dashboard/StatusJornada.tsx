@@ -15,34 +15,39 @@ export function StatusJornada() {
     // Se o motor ainda não carregou, mostramos um estado inicial ou nada
     if (!regulatoryState) return null;
 
+    // Lógica estrita de fluxo (Flow Guards)
+    const isStructureOk = onboarding.completouOnboarding;
+    const isMappingOk = isStructureOk && risksMapped && regulatoryState.state !== 'MAPEAMENTO_PENDENTE';
+    const isPgrOk = regulatoryState.progress >= 80;
+
     const journeySteps = [
         {
             id: 'estrutura',
             label: 'Estrutura Inicial',
-            status: onboarding.completouOnboarding ? 'done' : 'doing',
+            status: isStructureOk ? 'done' : 'doing',
             icon: Building2,
-            description: onboarding.completouOnboarding ? 'Base cadastrada com sucesso.' : 'Configure empresa, setores e equipe.',
-            action: !onboarding.completouOnboarding ? 'Abrir Guia' : null
+            description: isStructureOk ? 'Base cadastrada com sucesso.' : 'Configure empresa, setores e equipe.',
+            action: !isStructureOk ? 'Abrir Guia' : null
         },
         {
             id: 'riscos',
             label: 'Mapeamento de Riscos',
-            status: regulatoryState.state === 'MAPEAMENTO_PENDENTE' || regulatoryState.state === 'ESTRUTURA_OK'
-                ? 'doing'
-                : (regulatoryState.progress > 40 ? 'done' : 'locked'),
+            status: isMappingOk
+                ? 'done'
+                : (isStructureOk ? 'doing' : 'locked'),
             icon: ShieldAlert,
             description: risksMapped ? 'Identificação de perigos realizada.' : 'Identifique perigos e riscos por ambiente.',
-            action: regulatoryState.state === 'ESTRUTURA_OK' || regulatoryState.state === 'MAPEAMENTO_PENDENTE' ? 'Mapear Riscos' : null
+            action: (!isMappingOk && isStructureOk) ? 'Mapear Riscos' : null
         },
         {
             id: 'gro',
             label: 'Inventário GRO / PGR',
-            status: regulatoryState.state === 'INVENTARIO_PENDENTE'
-                ? 'doing'
-                : (regulatoryState.progress >= 80 ? 'done' : 'locked'),
+            status: isPgrOk
+                ? 'done'
+                : (isMappingOk ? 'doing' : 'locked'),
             icon: FileCheck,
             description: 'Gere os documentos obrigatórios da NR-1.',
-            action: regulatoryState.state === 'INVENTARIO_PENDENTE' ? 'Gerar PDF' : (regulatoryState.progress >= 80 ? 'Ver PDF' : null)
+            action: (isMappingOk && !isPgrOk) ? 'Gerar PDF' : (isPgrOk ? 'Ver PDF' : null)
         }
     ];
 
@@ -74,9 +79,9 @@ export function StatusJornada() {
                                 <div
                                     key={i}
                                     className={`w-3 h-1.5 rounded-full ${i === 1 && onboarding.completouOnboarding ? 'bg-success-500' :
-                                            i === 2 && regulatoryState.progress >= 60 ? 'bg-success-500' :
-                                                i === 3 && regulatoryState.progress === 100 ? 'bg-success-500' :
-                                                    'bg-neutral-200'
+                                        i === 2 && regulatoryState.progress >= 60 ? 'bg-success-500' :
+                                            i === 3 && regulatoryState.progress === 100 ? 'bg-success-500' :
+                                                'bg-neutral-200'
                                         }`}
                                 />
                             ))}

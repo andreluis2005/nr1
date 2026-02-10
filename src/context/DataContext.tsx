@@ -1,62 +1,17 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import type { RegulatoryEngineResult } from "@/domains/risks/nr1.engine";
-
-// --- Interfaces para Compatibilidade com a UI ---
-export interface Alerta {
-    id: string;
-    titulo: string;
-    descricao: string;
-    prioridade: 'baixa' | 'media' | 'alta' | 'critica';
-    status: 'pendente' | 'em_andamento' | 'resolvido';
-    dataCriacao: string;
-}
-
-export interface Funcionario {
-    id: string;
-    nome_completo: string;
-    matricula: string;
-    status: string;
-}
-
-export interface Exame {
-    id: string;
-    funcionarioId: string;
-    tipo: string;
-    status: 'vencido' | 'pendente' | 'realizado';
-    dataRealizacao: string;
-    dataVencimento: string;
-}
-
-export interface Treinamento {
-    id: string;
-    funcionarioId: string;
-    nr: string;
-    descricao: string;
-    status: 'vencido' | 'vigente' | 'agendado';
-    dataRealizacao: string;
-    dataVencimento: string;
-    cargaHoraria?: number;
-}
-
-export interface Setor {
-    id: string;
-    nome: string;
-    descricao?: string;
-    created_at: string;
-}
-
-export interface Risco {
-    id: string;
-    setor_id: string;
-    categoria: 'fisico' | 'quimico' | 'biologico' | 'ergonomico' | 'acidente';
-    nome: string;
-    descricao?: string;
-    severidade: number;
-    probabilidade: number;
-    medidas_controle?: string;
-    status: string;
-}
+import type {
+    Metrics,
+    Alerta,
+    Exame,
+    Treinamento,
+    OnboardingStatus,
+    Setor,
+    Risco,
+    MedidaControle, // Added
+    Funcionario
+} from "@/types";
 
 export interface TechnicalExposureResult {
     totalRiscos: number;
@@ -75,23 +30,6 @@ export interface ExposureSnapshot {
     dados_setores: Record<string, number>;
 }
 
-export interface Metrics {
-    totalFuncionarios: number;
-    funcionariosAtivos: number;
-    alertasPendentes: number;
-    alertasCriticos: number;
-    examesVencidos: number;
-    examesAVencer: number;
-    treinamentosVencidos: number;
-}
-
-export interface OnboardingStatus {
-    empresaCriada: boolean;
-    setorCadastrado: boolean;
-    funcionarioCadastrado: boolean;
-    completouOnboarding: boolean;
-}
-
 interface DataContextType {
     metrics: Metrics;
     alertas: Alerta[];
@@ -100,6 +38,7 @@ interface DataContextType {
     funcionarios: Funcionario[];
     setores: Setor[];
     riscos: Risco[];
+    medidasControle: MedidaControle[]; // Added
     onboarding: OnboardingStatus;
     regulatoryState: RegulatoryEngineResult | null;
     exposureData: TechnicalExposureResult | null;
@@ -123,6 +62,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         funcionarios,
         setores,
         riscos,
+        medidasControle, // Added
         onboarding,
         regulatoryState,
         exposureData,
@@ -140,6 +80,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             funcionarios,
             setores,
             riscos,
+            medidasControle, // Added
             onboarding,
             regulatoryState,
             exposureData,

@@ -1,3 +1,6 @@
+-- Enable pgcrypto for UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- Create table for structured Action Plan (Medidas de Controle)
 CREATE TABLE IF NOT EXISTS medidas_controle (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -22,12 +25,30 @@ CREATE TABLE IF NOT EXISTS medidas_controle (
 -- RLS Policies
 ALTER TABLE medidas_controle ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Enable read access for users in same company" ON medidas_controle
-    FOR SELECT USING (auth.uid() IN (
-        SELECT id FROM auth.users WHERE raw_user_meta_data->>'empresa_id' = empresa_id::text
-    ));
+-- Policy: Users view action plans for their company
+CREATE POLICY "Usuários veem medidas da empresa" ON medidas_controle
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.usuarios_empresas ue
+            WHERE ue.empresa_id = medidas_controle.empresa_id
+            AND ue.usuario_id = auth.uid()
+        )
+    );
 
-CREATE POLICY "Enable write access for users in same company" ON medidas_controle
-    FOR ALL USING (auth.uid() IN (
-        SELECT id FROM auth.users WHERE raw_user_meta_data->>'empresa_id' = empresa_id::text
-    ));
+-- Policy: Managers manage action plans (insert/update/delete)
+CREATE POLICY "Gestores gerenciam medidas" ON medidas_controle
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.usuarios_empresas ue
+            WHERE ue.empresa_id = medidas_controle.empresa_id
+            AND ue.usuario_id = auth.uid()
+            AND ue.perfil IN ('admin', 'gestor')
+        )
+    ) WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.usuarios_empresas ue
+            WHERE ue.empresa_id = medidas_controle.empresa_id
+            AND ue.usuario_id = auth.uid()
+            AND ue.perfil IN ('admin', 'gestor')
+        )
+    );

@@ -61,23 +61,40 @@ export function PGR() {
     { key: 'agir', label: 'Agir', icon: Circle, desc: 'Correções e Melhorias' },
   ];
 
-  const getCurrentEtapa = () => {
-    const hasPendingMeasures = allStructuredMeasures.some(m => m.status === 'planejado' || m.status === 'em_andamento' || m.status === 'atrasado');
+  // --- PDCA LOGIC (REFACTORED) ---
+  const calculatePDCAState = (
+    riscos: Risco[],
+    medidas: any[] // Using clean measure type
+  ): 'planejar' | 'fazer' | 'checar' | 'agir' => {
 
-    if (!regulatoryState) return 'planejar';
-    if (regulatoryState.state === 'ESTRUTURA_INCOMPLETA') return 'planejar';
-    if (regulatoryState.state === 'MAPEAMENTO_PENDENTE') return 'planejar';
+    // 1. PLANEJAR
+    // Não existem riscos OU existem riscos mas nenhuma medida cadastrada
+    if (riscos.length === 0) return 'planejar';
+    if (medidas.length === 0) return 'planejar';
 
-    if (riscos.length > 0 && allStructuredMeasures.length === 0) return 'planejar';
+    // 2. FAZER
+    // Existem medidas com status que indicam pendência
+    const hasPendingMeasures = medidas.some(m =>
+      ['planejado', 'em_andamento', 'atrasado'].includes(m.status)
+    );
     if (hasPendingMeasures) return 'fazer';
-    if (regulatoryState.state === 'INVENTARIO_PENDENTE') return 'fazer';
-    if (regulatoryState.state === 'CONFORME_PARCIAL') return 'checar';
-    if (regulatoryState.state === 'CONFORME_OURO') return 'agir';
 
+    // 3. CHECAR
+    // Todas as medidas estão concluídas, mas ainda não avaliadas como eficaz
+    const allConcluded = medidas.every(m => m.status === 'concluido');
+    const allEffective = medidas.every(m => m.eficaz === true);
+
+    if (allConcluded && !allEffective) return 'checar';
+
+    // 4. AGIR
+    // Todas as medidas concluídas E todas marcadas como eficaz = true
+    if (allConcluded && allEffective) return 'agir';
+
+    // Fallback padrão
     return 'planejar';
   };
 
-  const currentEtapa = getCurrentEtapa();
+  const currentEtapa = calculatePDCAState(riscos, allStructuredMeasures);
   const getEtapaIndex = (etapa: string) => etapasPDCA.findIndex(e => e.key === etapa);
   const currentEtapaIndex = getEtapaIndex(currentEtapa);
 
@@ -93,7 +110,8 @@ export function PGR() {
     return acc;
   }, {} as Record<string, number>);
 
-  const pgrAtivo = regulatoryState?.state === 'CONFORME_OURO' || regulatoryState?.state === 'CONFORME_PARCIAL';
+  // PGR Ativo = Etapa Checar ou Agir (Ciclo Avançado)
+  const pgrAtivo = currentEtapa === 'checar' || currentEtapa === 'agir';
 
   const handleOpenActionPlan = (risco: Risco) => {
     setSelectedRisk(risco);

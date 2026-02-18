@@ -18,7 +18,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CheckCircle, Clock, Save, Trash2, Plus, AlertCircle, Bookmark, Users } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Save, Trash2, Plus, AlertCircle, Bookmark } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
